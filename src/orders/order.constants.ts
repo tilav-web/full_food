@@ -1,0 +1,1 @@
+export const DEFAULT_ORDER_DRAFT_TTL_SECONDS = 15 * 60;

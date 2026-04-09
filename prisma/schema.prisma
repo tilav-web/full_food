@@ -13,6 +13,24 @@ enum Role {
   USER
 }
 
+enum OrderStatus {
+  NEW
+  ACCEPTED
+  PREPARING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum OrderLocationSource {
+  BOT_LOCATION
+}
+
 model User {
   id               String   @id @default(cuid())
   telegramId       String?  @unique
@@ -24,6 +42,7 @@ model User {
   lastName         String   @default("-")
   role             Role     @default(USER)
   cartItems        CartItem[]
+  orders           Order[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -65,5 +84,59 @@ model CartItem {
 
   @@unique([userId, productId])
   @@index([userId])
+  @@index([productId])
+}
+
+model Order {
+  id                 String              @id @default(cuid())
+  orderNumber        String              @unique
+  userId             String
+  status             OrderStatus         @default(NEW)
+  paymentStatus      PaymentStatus       @default(PENDING)
+  locationSource     OrderLocationSource @default(BOT_LOCATION)
+  latitude           Float
+  longitude          Float
+  locationReceivedAt DateTime
+  customerPhone      String
+  customerFirstName  String
+  customerLastName   String
+  addressLine        String
+  entrance           String?
+  floor              String?
+  apartment          String?
+  note               String?
+  cancelReason       String?
+  subtotal           Decimal
+  deliveryFee        Decimal             @default(0)
+  totalPrice         Decimal
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items              OrderItem[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([customerPhone])
+}
+
+model OrderItem {
+  id                 String   @id @default(cuid())
+  orderId            String
+  productId          String?
+  productImage       String
+  productName        String
+  productDescription String
+  categoryId         String?
+  categoryImage      String
+  categoryName       String
+  unitPrice          Decimal
+  quantity           Int
+  lineTotal          Decimal
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([orderId])
   @@index([productId])
 }

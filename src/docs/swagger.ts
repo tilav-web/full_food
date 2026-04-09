@@ -28,6 +28,10 @@ export function setupSwagger(app: INestApplication) {
       'Product CRUD, search, filter va pagination endpointlari',
     )
     .addTag('Cart', 'Foydalanuvchi savati va cart summary endpointlari')
+    .addTag(
+      'Orders',
+      'Redis checkout draft, Telegram location finalize va order management endpointlari',
+    )
     .addApiKey(
       {
         type: 'apiKey',

@@ -4,8 +4,10 @@ import { AuthModule } from './auth/auth.module';
 import { BotModule } from './bot/bot.module';
 import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
+import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
+import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -15,12 +17,14 @@ import { UsersModule } from './users/users.module';
       envFilePath: ['.env.local', '.env'],
     }),
     PrismaModule,
+    RedisModule,
     UsersModule,
     AuthModule,
     BotModule,
     CartModule,
     CategoriesModule,
     ProductsModule,
+    OrdersModule,
   ],
   controllers: [],
   providers: [],

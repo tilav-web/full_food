@@ -7,8 +7,8 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import {
-  MessageResponseDoc,
   PasswordLoginResponseDoc,
+  SessionMessageResponseDoc,
   VerifyTelegramInitDataResponseDoc,
 } from '../docs/swagger.models';
 import { ApiRefreshCookieAuth } from '../docs/swagger.decorators';
@@ -87,7 +87,7 @@ export class AuthController {
   })
   @ApiRefreshCookieAuth()
   @ApiOkResponse({
-    type: MessageResponseDoc,
+    type: SessionMessageResponseDoc,
   })
   logoutWebSession(
     @Req() request: Request,
