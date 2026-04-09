@@ -18,6 +18,8 @@ model User {
   telegramId       String?  @unique
   telegramUsername String?
   phone            String   @unique
+  password         String?
+  refreshTokenHash String?
   firstName        String   @default("-")
   lastName         String   @default("-")
   role             Role     @default(USER)

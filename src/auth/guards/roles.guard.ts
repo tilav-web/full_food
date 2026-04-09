@@ -24,7 +24,7 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<TelegramRequest>();
-    const user = request.telegramAuth?.user;
+    const user = request.authUser ?? request.telegramAuth?.user;
 
     if (!user) {
       throw new ForbiddenException(

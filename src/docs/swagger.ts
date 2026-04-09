@@ -1,3 +1,4 @@
+import { DEFAULT_REFRESH_COOKIE_NAME } from '../auth/auth.constants';
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
@@ -10,9 +11,10 @@ export function setupSwagger(app: INestApplication) {
       [
         'Telegram Mini App backend API dokumentatsiyasi.',
         '',
-        'Autentifikatsiya uchun ikkita usuldan biri ishlatiladi:',
-        '1. `x-telegram-init-data` header ichida raw Telegram `initData` yuborish.',
-        '2. `Authorization` header ichida `tma <initData>` formatidan foydalanish.',
+        'Autentifikatsiya ikki oqimga bo`lingan:',
+        '1. Mini App userlar uchun `x-telegram-init-data` header ishlatiladi.',
+        '2. Web admin/kassir uchun `Authorization: Bearer <access_token>` ishlatiladi.',
+        '3. Refresh endpointi httpOnly cookie orqali ishlaydi.',
         '',
         'Admin CRUD route`lari faqat `SUPER_ADMIN` uchun ochiq.',
       ].join('\n'),
@@ -36,14 +38,25 @@ export function setupSwagger(app: INestApplication) {
       },
       'telegram-init-data',
     )
-    .addApiKey(
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'Web admin va kassir uchun access token. `Authorization: Bearer <token>` formatida yuboriladi.',
+      },
+      'access-token',
+    )
+    .addCookieAuth(
+      DEFAULT_REFRESH_COOKIE_NAME,
       {
         type: 'apiKey',
-        in: 'header',
-        name: 'Authorization',
-        description: 'Alternativ usul: `tma <initData>` formatida yuboriladi.',
+        in: 'cookie',
+        name: DEFAULT_REFRESH_COOKIE_NAME,
+        description: 'Web session refresh qilish uchun httpOnly cookie.',
       },
-      'telegram-tma',
+      'refresh-token-cookie',
     )
     .build();
 

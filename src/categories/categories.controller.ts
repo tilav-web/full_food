@@ -21,9 +21,13 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
-import { ApiTelegramInitDataAuth } from '../docs/swagger.decorators';
+import {
+  ApiTelegramInitDataAuth,
+  ApiWebBearerAuth,
+} from '../docs/swagger.decorators';
 import {
   CategoryResponseDoc,
   MessageResponseDoc,
@@ -34,23 +38,25 @@ import { ListCategoriesQueryDto } from './dto/list-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Controller('categories')
-@UseGuards(TelegramAuthGuard)
 @ApiTags('Categories')
-@ApiTelegramInitDataAuth()
-@ApiUnauthorizedResponse({
-  description: "Telegram initData header yuborilmagan yoki noto'g'ri.",
-})
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
+  @UseGuards(HybridAuthGuard)
+  @ApiTelegramInitDataAuth()
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: "Category ro'yxatini olish",
-    description: 'Categorylarni qidiruv bilan olish endpointi.',
+    description:
+      'Categorylarni qidiruv bilan olish endpointi. Mini App user `x-telegram-init-data`, web admin esa `Bearer` token bilan kira oladi.',
   })
   @ApiOkResponse({
     type: CategoryResponseDoc,
     isArray: true,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Kerakli auth yuborilmagan yoki noto'g'ri.",
   })
   findAll(@Query() query: ListCategoriesQueryDto) {
     return this.categoriesService.findAll(query);
@@ -58,7 +64,8 @@ export class CategoriesController {
 
   @Post()
   @Roles(Role.SUPER_ADMIN)
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: 'Category yaratish',
     description: 'Faqat `SUPER_ADMIN` foydalanuvchi category yarata oladi.',
@@ -78,7 +85,8 @@ export class CategoriesController {
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN)
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: 'Category ni yangilash',
   })
@@ -101,7 +109,8 @@ export class CategoriesController {
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: "Category ni o'chirish",
   })

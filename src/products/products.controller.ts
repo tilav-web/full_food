@@ -20,9 +20,13 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
-import { ApiTelegramInitDataAuth } from '../docs/swagger.decorators';
+import {
+  ApiTelegramInitDataAuth,
+  ApiWebBearerAuth,
+} from '../docs/swagger.decorators';
 import {
   MessageResponseDoc,
   ProductListResponseDoc,
@@ -34,29 +38,33 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
 @Controller('products')
-@UseGuards(TelegramAuthGuard)
 @ApiTags('Products')
-@ApiTelegramInitDataAuth()
-@ApiUnauthorizedResponse({
-  description: "Telegram initData header yuborilmagan yoki noto'g'ri.",
-})
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
+  @UseGuards(HybridAuthGuard)
+  @ApiTelegramInitDataAuth()
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: "Productlar ro'yxati",
     description:
-      'Search, category filter, active filter va pagination bilan productlarni qaytaradi.',
+      'Search, category filter, active filter va pagination bilan productlarni qaytaradi. Mini App user initData bilan, web admin esa Bearer token bilan ishlatadi.',
   })
   @ApiOkResponse({
     type: ProductListResponseDoc,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Kerakli auth yuborilmagan yoki noto'g'ri.",
   })
   findAll(@Query() query: ListProductsQueryDto) {
     return this.productsService.findAll(query);
   }
 
   @Get(':id')
+  @UseGuards(HybridAuthGuard)
+  @ApiTelegramInitDataAuth()
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: 'Bitta productni olish',
   })
@@ -67,13 +75,17 @@ export class ProductsController {
   @ApiOkResponse({
     type: ProductResponseDoc,
   })
+  @ApiUnauthorizedResponse({
+    description: "Kerakli auth yuborilmagan yoki noto'g'ri.",
+  })
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
   }
 
   @Post()
   @Roles(Role.SUPER_ADMIN)
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: 'Product yaratish',
     description: 'Faqat `SUPER_ADMIN` product yarata oladi.',
@@ -90,7 +102,8 @@ export class ProductsController {
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN)
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: 'Product ni yangilash',
   })
@@ -110,7 +123,8 @@ export class ProductsController {
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
   @ApiOperation({
     summary: "Product ni o'chirish",
   })

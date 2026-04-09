@@ -32,12 +32,6 @@ export class TelegramAuthGuard implements CanActivate {
       return headerValue.trim();
     }
 
-    const authorization = request.headers.authorization;
-
-    if (authorization?.startsWith('tma ')) {
-      return authorization.slice(4).trim();
-    }
-
     return null;
   }
 }

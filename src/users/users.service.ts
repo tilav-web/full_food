@@ -31,6 +31,18 @@ export type PublicUser = {
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  async findByPhone(phone: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { phone },
+    });
+  }
+
   async registerTelegramUser(
     input: TelegramRegistrationInput,
   ): Promise<PublicUser> {
@@ -123,6 +135,24 @@ export class UsersService {
     });
 
     return user ? this.toPublicUser(user) : null;
+  }
+
+  async findPublicById(id: string): Promise<PublicUser | null> {
+    const user = await this.findById(id);
+
+    return user ? this.toPublicUser(user) : null;
+  }
+
+  async updateRefreshTokenHash(
+    userId: string,
+    refreshTokenHash: string | null,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        refreshTokenHash,
+      },
+    });
   }
 
   toPublicUser(user: User): PublicUser {

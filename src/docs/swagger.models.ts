@@ -58,6 +58,19 @@ export class PublicUserResponseDoc {
   updatedAt!: string;
 }
 
+export class PasswordLoginResponseDoc {
+  @ApiProperty({
+    example:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW56ZDh4d2QwMDAycDZmMG44eXoxYWJjIiwicm9sZSI6IlNVUEVSX0FETUlOIn0.signature',
+  })
+  accessToken!: string;
+
+  @ApiProperty({
+    type: () => PublicUserResponseDoc,
+  })
+  user!: PublicUserResponseDoc;
+}
+
 export class TelegramInitDataUserDoc {
   @ApiProperty({
     example: 123456789,
