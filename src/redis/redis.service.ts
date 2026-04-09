@@ -1,8 +1,8 @@
 import {
   Injectable,
-  InternalServerErrorException,
   Logger,
   OnModuleDestroy,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
@@ -93,8 +93,8 @@ export class RedisService implements OnModuleDestroy {
           const message =
             error instanceof Error ? error.message : String(error);
 
-          throw new InternalServerErrorException(
-            `Redis bilan ulanishda xatolik yuz berdi: ${message}`,
+          throw new ServiceUnavailableException(
+            `Redis hozircha mavjud emas: ${message}`,
           );
         });
 
