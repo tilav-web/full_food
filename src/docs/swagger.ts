@@ -4,6 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 export function setupSwagger(app: INestApplication) {
   const port = process.env.PORT ?? 3000;
+  const swaggerServerUrl =
+    process.env.SERVER_URL?.trim() || `http://localhost:${port}`;
 
   const config = new DocumentBuilder()
     .setTitle('Full Food API')
@@ -20,7 +22,7 @@ export function setupSwagger(app: INestApplication) {
       ].join('\n'),
     )
     .setVersion('1.0.0')
-    .addServer(`http://localhost:${port}`, 'Local development')
+    .addServer(swaggerServerUrl, 'API server')
     .addTag('Auth', 'Telegram Mini App initData verification endpointlari')
     .addTag('Users', 'Super admin uchun user management endpointlari')
     .addTag('Bot', 'Telegram bot admin broadcast endpointlari')
