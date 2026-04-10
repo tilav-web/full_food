@@ -65,7 +65,7 @@ const products: ProductSeed[] = [
   },
   {
     name: 'Fanta 0.5L',
-    description: 'Apelsin ta\'mli gazli ichimlik.',
+    description: "Apelsin ta'mli gazli ichimlik.",
     image: 'https://cdn.fullfood.uz/products/fanta-05.png',
     price: 9000,
     categoryName: 'Ichimliklar',
@@ -86,7 +86,7 @@ const products: ProductSeed[] = [
   },
   {
     name: 'Double Burger',
-    description: "Ikki qavatli kotlet va pishloq bilan.",
+    description: 'Ikki qavatli kotlet va pishloq bilan.',
     image: 'https://cdn.fullfood.uz/products/double-burger.png',
     price: 45000,
     categoryName: 'Burgerlar',
@@ -166,41 +166,50 @@ async function upsertProducts() {
       0,
     );
 
-    await prisma.product.upsert({
+    const existingProduct = await prisma.product.findFirst({
       where: { name: product.name },
-      update: {
-        description: product.description,
-        image: product.image,
-        price: product.price,
-        categoryId: category.id,
-        unitId: unit.id,
-        stockQuantity: totalQuantity,
-        isActive: totalQuantity > 0,
-      },
-      create: {
-        name: product.name,
-        description: product.description,
-        image: product.image,
-        price: product.price,
-        categoryId: category.id,
-        unitId: unit.id,
-        stockQuantity: totalQuantity,
-        isActive: totalQuantity > 0,
-      },
+      select: { id: true },
     });
+
+    if (existingProduct) {
+      await prisma.product.update({
+        where: { id: existingProduct.id },
+        data: {
+          description: product.description,
+          image: product.image,
+          price: product.price,
+          categoryId: category.id,
+          unitId: unit.id,
+          stockQuantity: totalQuantity,
+          isActive: totalQuantity > 0,
+        },
+      });
+    } else {
+      await prisma.product.create({
+        data: {
+          name: product.name,
+          description: product.description,
+          image: product.image,
+          price: product.price,
+          categoryId: category.id,
+          unitId: unit.id,
+          stockQuantity: totalQuantity,
+          isActive: totalQuantity > 0,
+        },
+      });
+    }
   }
 }
 
 async function createBatches() {
   const productByName = new Map(
-    (await prisma.product.findMany()).map((product) => [
-      product.name,
-      product,
-    ]),
+    (await prisma.product.findMany()).map((product) => [product.name, product]),
   );
 
   const staffPhone =
-    process.env.SEED_SUPER_ADMIN_PHONE ?? process.env.SEED_CASHIER_PHONE ?? null;
+    process.env.SEED_SUPER_ADMIN_PHONE ??
+    process.env.SEED_CASHIER_PHONE ??
+    null;
   const staffUser = staffPhone
     ? await prisma.user.findUnique({
         where: { phone: normalizeUzbekPhoneNumber(staffPhone) },
