@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -32,6 +33,9 @@ import {
   ProductListResponseDoc,
   ProductResponseDoc,
 } from '../docs/swagger.models';
+import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
+import type { PublicUser } from '../users/users.service';
+import { AddProductStockDto } from './dto/add-product-stock.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -119,6 +123,34 @@ export class ProductsController {
   })
   update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.productsService.update(id, dto);
+  }
+
+  @Post(':id/stock')
+  @Roles(Role.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Product omboriga yangi batch qo'shish",
+    description:
+      "Admin product omboriga kelgan batchni qo'shadi. Stock ko'payadi va product avtomatik active bo'ladi.",
+  })
+  @ApiParam({
+    name: 'id',
+    example: 'cmnzd8xwd0002p6f0n8yz1abc',
+  })
+  @ApiOkResponse({
+    type: ProductResponseDoc,
+  })
+  @ApiForbiddenResponse({
+    description: 'Faqat SUPER_ADMIN uchun.',
+  })
+  addStock(
+    @Param('id') id: string,
+    @Body() dto: AddProductStockDto,
+    @CurrentAuthUser() staffUser: PublicUser,
+  ) {
+    return this.productsService.addStock(id, dto, staffUser);
   }
 
   @Delete(':id')

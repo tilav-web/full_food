@@ -64,4 +64,12 @@ export class UpdateProductDto {
   @IsNotEmpty()
   @IsOptional()
   categoryId?: string;
+
+  @ApiPropertyOptional({
+    example: 'cmnzd2aqf0001p6f0s2lm8xyz',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  unitId?: string;
 }

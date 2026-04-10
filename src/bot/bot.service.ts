@@ -109,6 +109,57 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async sendOrderNotification(payload: {
+    orderNumber: string;
+    source: string;
+    customerName: string;
+    customerPhone: string;
+    addressLine: string;
+    entrance: string | null;
+    floor: string | null;
+    apartment: string | null;
+    totalPrice: number;
+    itemsCount: number;
+  }): Promise<void> {
+    if (!this.bot) {
+      return;
+    }
+
+    const channelId = this.configService.get<string>(
+      'TELEGRAM_ORDERS_CHANNEL_ID',
+    );
+
+    if (!channelId) {
+      return;
+    }
+
+    const addressParts = [
+      payload.addressLine,
+      payload.entrance ? `Kirish: ${payload.entrance}` : null,
+      payload.floor ? `Qavat: ${payload.floor}` : null,
+      payload.apartment ? `Xonadon: ${payload.apartment}` : null,
+    ].filter((part) => part !== null);
+
+    const message = [
+      `Yangi buyurtma: ${payload.orderNumber}`,
+      `Manba: ${payload.source}`,
+      `Mijoz: ${payload.customerName}`,
+      `Telefon: ${payload.customerPhone}`,
+      `Manzil: ${addressParts.join(', ')}`,
+      `Mahsulotlar: ${payload.itemsCount} ta`,
+      `Jami: ${payload.totalPrice}`,
+    ].join('\n');
+
+    try {
+      await this.bot.api.sendMessage(channelId, message);
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Order xabari Telegram kanalga yuborilmadi: ${messageText}`,
+      );
+    }
+  }
+
   private registerHandlers() {
     if (!this.bot) {
       return;

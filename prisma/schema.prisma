@@ -51,6 +51,7 @@ model User {
   cartItems        CartItem[]
   orders           Order[]  @relation("CustomerOrders")
   createdOrders    Order[]  @relation("StaffCreatedOrders")
+  createdBatches   InventoryBatch[] @relation("StaffCreatedBatches")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -65,22 +66,37 @@ model Category {
   products Product[]
 }
 
+model Unit {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  symbol    String   @unique
+  products  Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Product {
-  id          String   @id @default(cuid())
-  image       String
-  name        String
-  description String
-  price       Decimal
-  isActive    Boolean  @default(true)
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
-  cartItems   CartItem[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  image         String
+  name          String
+  description   String
+  price         Decimal
+  stockQuantity Int      @default(0)
+  isActive      Boolean  @default(true)
+  categoryId    String
+  unitId        String
+  category      Category @relation(fields: [categoryId], references: [id])
+  unit          Unit     @relation(fields: [unitId], references: [id])
+  cartItems     CartItem[]
+  batches       InventoryBatch[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([categoryId])
   @@index([name])
   @@index([isActive])
+  @@index([unitId])
+  @@index([stockQuantity])
 }
 
 model CartItem {
@@ -96,6 +112,20 @@ model CartItem {
   @@unique([userId, productId])
   @@index([userId])
   @@index([productId])
+}
+
+model InventoryBatch {
+  id               String   @id @default(cuid())
+  productId        String
+  quantity         Int
+  receivedAt       DateTime
+  createdByStaffId String?
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdByStaff   User?    @relation("StaffCreatedBatches", fields: [createdByStaffId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+
+  @@index([productId, receivedAt])
+  @@index([createdByStaffId])
 }
 
 model Order {

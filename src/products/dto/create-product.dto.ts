@@ -61,4 +61,11 @@ export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
   categoryId!: string;
+
+  @ApiProperty({
+    example: 'cmnzd2aqf0001p6f0s2lm8xyz',
+  })
+  @IsString()
+  @IsNotEmpty()
+  unitId!: string;
 }

@@ -15,6 +15,7 @@ import {
   Role,
 } from '@prisma/client';
 import { randomInt } from 'node:crypto';
+import { BotService } from '../bot/bot.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizeUzbekPhoneNumber } from '../users/phone.util';
 import type { PublicUser } from '../users/users.service';
@@ -143,7 +144,10 @@ type OrderCreationPayload = {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly botService: BotService,
+  ) {}
 
   async checkout(
     user: PublicUser,
@@ -153,6 +157,8 @@ export class OrdersService {
     const delivery = this.normalizeDelivery(dto);
 
     const order = await this.prisma.$transaction(async (transaction) => {
+      await this.decrementStockForItems(transaction, items);
+
       const createdOrder = await this.createOrderRecord(transaction, {
         userId: user.id,
         createdByStaffId: null,
@@ -181,6 +187,7 @@ export class OrdersService {
       return createdOrder;
     });
 
+    await this.notifyOrderCreated(order);
     return this.toOrderResponse(order);
   }
 
@@ -200,8 +207,10 @@ export class OrdersService {
     const items = await this.getPreparedRequestedItems(dto.items);
     const delivery = this.normalizeDelivery(dto);
 
-    const order = await this.prisma.$transaction((transaction) =>
-      this.createOrderRecord(transaction, {
+    const order = await this.prisma.$transaction(async (transaction) => {
+      await this.decrementStockForItems(transaction, items);
+
+      return this.createOrderRecord(transaction, {
         userId: customerUserId,
         createdByStaffId: staffUser.id,
         source: OrderSource.CASHIER_PANEL,
@@ -224,9 +233,10 @@ export class OrdersService {
         },
         delivery,
         items,
-      }),
-    );
+      });
+    });
 
+    await this.notifyOrderCreated(order);
     return this.toOrderResponse(order);
   }
 
@@ -597,6 +607,12 @@ export class OrdersService {
       );
     }
 
+    if (product.stockQuantity < quantity) {
+      throw new BadRequestException(
+        `\`${product.name}\` omborda yetarli emas.`,
+      );
+    }
+
     const unitPrice = new Prisma.Decimal(product.price);
     const lineTotal = unitPrice.mul(quantity);
 
@@ -618,6 +634,61 @@ export class OrdersService {
         },
       },
     };
+  }
+
+  private async decrementStockForItems(
+    transaction: Prisma.TransactionClient,
+    items: PreparedOrderItem[],
+  ): Promise<void> {
+    for (const item of items) {
+      const product = await transaction.product.findUnique({
+        where: { id: item.productId },
+        select: {
+          id: true,
+          stockQuantity: true,
+        },
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product topilmadi.');
+      }
+
+      if (product.stockQuantity < item.quantity) {
+        throw new BadRequestException(
+          `\`${item.product.name}\` omborda yetarli emas.`,
+        );
+      }
+
+      const nextStock = product.stockQuantity - item.quantity;
+
+      await transaction.product.update({
+        where: { id: product.id },
+        data: {
+          stockQuantity: nextStock,
+          isActive: nextStock > 0,
+        },
+      });
+    }
+  }
+
+  private async notifyOrderCreated(order: OrderWithItems): Promise<void> {
+    const totalPrice = order.items.reduce(
+      (sum, item) => sum.add(new Prisma.Decimal(item.lineTotal)),
+      new Prisma.Decimal(0),
+    );
+
+    await this.botService.sendOrderNotification({
+      orderNumber: order.orderNumber,
+      source: order.source,
+      customerName: `${order.customerFirstName} ${order.customerLastName}`.trim(),
+      customerPhone: order.customerPhone,
+      addressLine: order.addressLine,
+      entrance: order.entrance,
+      floor: order.floor,
+      apartment: order.apartment,
+      totalPrice: Number(totalPrice),
+      itemsCount: order.items.length,
+    });
   }
 
   private async createOrderRecord(

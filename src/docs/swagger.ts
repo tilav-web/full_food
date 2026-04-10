@@ -27,6 +27,7 @@ export function setupSwagger(app: INestApplication) {
     .addTag('Users', 'Super admin uchun user management endpointlari')
     .addTag('Bot', 'Telegram bot admin broadcast endpointlari')
     .addTag('Categories', 'Product category CRUD va listing endpointlari')
+    .addTag('Units', 'Product unit CRUD va listing endpointlari')
     .addTag(
       'Products',
       'Product CRUD, search, filter va pagination endpointlari',

@@ -21,12 +21,19 @@ type CartItemResponse = {
     name: string;
     description: string;
     price: number;
+    stockQuantity: number;
     isActive: boolean;
     categoryId: string;
+    unitId: string;
     category: {
       id: string;
       image: string;
       name: string;
+    };
+    unit: {
+      id: string;
+      name: string;
+      symbol: string;
     };
   };
 };
@@ -57,6 +64,7 @@ export class CartService {
       select: {
         id: true,
         isActive: true,
+        stockQuantity: true,
       },
     });
 
@@ -68,6 +76,28 @@ export class CartService {
       throw new BadRequestException(
         "Faqat active bo'lgan product savatga qo'shiladi.",
       );
+    }
+
+    if (product.stockQuantity <= 0) {
+      throw new BadRequestException('Product omborda tugagan.');
+    }
+
+    const existingCartItem = await this.prisma.cartItem.findUnique({
+      where: {
+        userId_productId: {
+          userId: user.id,
+          productId,
+        },
+      },
+      select: {
+        quantity: true,
+      },
+    });
+
+    const nextQuantity = (existingCartItem?.quantity ?? 0) + quantityToAdd;
+
+    if (nextQuantity > product.stockQuantity) {
+      throw new BadRequestException('Product omborda yetarli emas.');
     }
 
     await this.prisma.cartItem.upsert({
@@ -111,6 +141,7 @@ export class CartService {
           select: {
             id: true,
             isActive: true,
+            stockQuantity: true,
           },
         },
       },
@@ -124,6 +155,10 @@ export class CartService {
       throw new BadRequestException(
         "Active bo'lmagan product quantity'sini o'zgartirib bo'lmaydi.",
       );
+    }
+
+    if (dto.quantity > cartItem.product.stockQuantity) {
+      throw new BadRequestException('Product omborda yetarli emas.');
     }
 
     await this.prisma.cartItem.update({
@@ -181,6 +216,7 @@ export class CartService {
         product: {
           include: {
             category: true,
+            unit: true,
           },
         },
       },
@@ -211,12 +247,19 @@ export class CartService {
           name: cartItem.product.name,
           description: cartItem.product.description,
           price: Number(cartItem.product.price),
+          stockQuantity: cartItem.product.stockQuantity,
           isActive: cartItem.product.isActive,
           categoryId: cartItem.product.categoryId,
+          unitId: cartItem.product.unitId,
           category: {
             id: cartItem.product.category.id,
             image: cartItem.product.category.image,
             name: cartItem.product.category.name,
+          },
+          unit: {
+            id: cartItem.product.unit.id,
+            name: cartItem.product.unit.name,
+            symbol: cartItem.product.unit.symbol,
           },
         },
       };

@@ -184,6 +184,23 @@ export class CategoryResponseDoc {
   name!: string;
 }
 
+export class UnitResponseDoc {
+  @ApiProperty({
+    example: 'cmnzd2aqf0001p6f0s2lm8xyz',
+  })
+  id!: string;
+
+  @ApiProperty({
+    example: 'Dona',
+  })
+  name!: string;
+
+  @ApiProperty({
+    example: 'dona',
+  })
+  symbol!: string;
+}
+
 export class ProductResponseDoc {
   @ApiProperty({
     example: 'cmnzd8xwd0002p6f0n8yz1abc',
@@ -211,6 +228,11 @@ export class ProductResponseDoc {
   price!: number;
 
   @ApiProperty({
+    example: 45,
+  })
+  stockQuantity!: number;
+
+  @ApiProperty({
     example: true,
   })
   isActive!: boolean;
@@ -221,9 +243,19 @@ export class ProductResponseDoc {
   categoryId!: string;
 
   @ApiProperty({
+    example: 'cmnzd2aqf0001p6f0s2lm8xyz',
+  })
+  unitId!: string;
+
+  @ApiProperty({
     type: () => CategoryResponseDoc,
   })
   category!: CategoryResponseDoc;
+
+  @ApiProperty({
+    type: () => UnitResponseDoc,
+  })
+  unit!: UnitResponseDoc;
 
   @ApiProperty({
     example: '2026-04-10T10:15:20.000Z',
@@ -331,6 +363,11 @@ export class CartProductResponseDoc {
   price!: number;
 
   @ApiProperty({
+    example: 45,
+  })
+  stockQuantity!: number;
+
+  @ApiProperty({
     example: true,
   })
   isActive!: boolean;
@@ -341,9 +378,19 @@ export class CartProductResponseDoc {
   categoryId!: string;
 
   @ApiProperty({
+    example: 'cmnzd2aqf0001p6f0s2lm8xyz',
+  })
+  unitId!: string;
+
+  @ApiProperty({
     type: () => CategoryResponseDoc,
   })
   category!: CategoryResponseDoc;
+
+  @ApiProperty({
+    type: () => UnitResponseDoc,
+  })
+  unit!: UnitResponseDoc;
 }
 
 export class CartItemResponseDoc {
