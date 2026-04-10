@@ -25,7 +25,10 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) {
         callback(null, true);
         return;
