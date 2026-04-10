@@ -11,6 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "seed": "ts-node --transpile-only prisma/seed.ts",
+    "seed:mock": "ts-node --transpile-only prisma/seed-mock.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
