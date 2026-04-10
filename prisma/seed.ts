@@ -5,22 +5,44 @@ import { normalizeUzbekPhoneNumber } from '../src/users/phone.util';
 const prisma = new PrismaClient();
 
 async function main() {
-  const phone = normalizeUzbekPhoneNumber('777422302');
-  const hashedPassword = await hash(
-    process.env.SEED_SUPER_ADMIN_PASSWORD ?? '777422302',
-    10,
+  const superAdminPhone = normalizeUzbekPhoneNumber(
+    process.env.SEED_SUPER_ADMIN_PHONE ?? '777422302',
   );
+  const superAdminPassword =
+    process.env.SEED_SUPER_ADMIN_PASSWORD ?? '777422302';
+  const hashedSuperAdminPassword = await hash(superAdminPassword, 10);
 
   await prisma.user.upsert({
-    where: { phone },
+    where: { phone: superAdminPhone },
     update: {
       role: Role.SUPER_ADMIN,
-      password: hashedPassword,
+      password: hashedSuperAdminPassword,
     },
     create: {
-      phone,
+      phone: superAdminPhone,
       role: Role.SUPER_ADMIN,
-      password: hashedPassword,
+      password: hashedSuperAdminPassword,
+      firstName: '-',
+      lastName: '-',
+    },
+  });
+
+  const cashierPhone = normalizeUzbekPhoneNumber(
+    process.env.SEED_CASHIER_PHONE ?? '991258875',
+  );
+  const cashierPassword = process.env.SEED_CASHIER_PASSWORD ?? '12345678';
+  const hashedCashierPassword = await hash(cashierPassword, 10);
+
+  await prisma.user.upsert({
+    where: { phone: cashierPhone },
+    update: {
+      role: Role.CASHIER,
+      password: hashedCashierPassword,
+    },
+    create: {
+      phone: cashierPhone,
+      role: Role.CASHIER,
+      password: hashedCashierPassword,
       firstName: '-',
       lastName: '-',
     },
