@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { OrderSource, OrderStatus, PaymentStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
@@ -58,4 +58,12 @@ export class ListOrdersQueryDto {
   @IsOptional()
   @IsEnum(PaymentStatus)
   paymentStatus?: PaymentStatus;
+
+  @ApiPropertyOptional({
+    enum: OrderSource,
+    example: OrderSource.CASHIER_PANEL,
+  })
+  @IsOptional()
+  @IsEnum(OrderSource)
+  source?: OrderSource;
 }

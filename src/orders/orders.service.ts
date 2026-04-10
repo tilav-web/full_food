@@ -8,19 +8,27 @@ import {
   Order,
   OrderItem,
   OrderLocationSource,
+  OrderSource,
   OrderStatus,
   PaymentStatus,
   Prisma,
+  Role,
 } from '@prisma/client';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeUzbekPhoneNumber } from '../users/phone.util';
 import type { PublicUser } from '../users/users.service';
+import { CreateAdminOrderDto } from './dto/create-admin-order.dto';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
 
-type CheckoutItem = {
+type ProductWithCategory = Prisma.ProductGetPayload<{
+  include: { category: true };
+}>;
+
+type PreparedOrderItem = {
   productId: string;
   quantity: number;
   unitPrice: number;
@@ -42,6 +50,7 @@ type CheckoutItem = {
 type OrderResponse = {
   id: string;
   orderNumber: string;
+  source: OrderSource;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   customer: {
@@ -105,6 +114,33 @@ type OrderWithItems = Order & {
 
 type OrderNumberClient = PrismaService | Prisma.TransactionClient;
 
+type DeliveryPayload = {
+  addressLine: string;
+  entrance: string | null;
+  floor: string | null;
+  apartment: string | null;
+  note: string | null;
+};
+
+type OrderCreationPayload = {
+  userId: string | null;
+  createdByStaffId: string | null;
+  source: OrderSource;
+  paymentStatus: PaymentStatus;
+  location: {
+    source: OrderLocationSource;
+    latitude: number;
+    longitude: number;
+  };
+  customer: {
+    phone: string;
+    firstName: string;
+    lastName: string;
+  };
+  delivery: DeliveryPayload;
+  items: PreparedOrderItem[];
+};
+
 @Injectable()
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -113,176 +149,83 @@ export class OrdersService {
     user: PublicUser,
     dto: CreateCheckoutDto,
   ): Promise<OrderResponse> {
-    const cartItems = await this.prisma.cartItem.findMany({
-      where: {
-        userId: user.id,
-      },
-      include: {
-        product: {
-          include: {
-            category: true,
-          },
-        },
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    });
-
-    if (cartItems.length === 0) {
-      throw new BadRequestException(
-        'Checkout qilish uchun savat bo`sh bo`lmasligi kerak.',
-      );
-    }
-
-    const inactiveCartItem = cartItems.find(
-      (cartItem) => !cartItem.product.isActive,
-    );
-
-    if (inactiveCartItem) {
-      throw new BadRequestException(
-        `\`${inactiveCartItem.product.name}\` active emas. Checkout oldidan savatni yangilang.`,
-      );
-    }
-
-    const addressLine = dto.addressLine.trim();
-
-    if (addressLine.length < 5) {
-      throw new BadRequestException(
-        'Yetkazib berish manzili kamida 5 ta belgidan iborat bo`lishi kerak.',
-      );
-    }
-
-    let totalQuantity = 0;
-    let subtotal = new Prisma.Decimal(0);
-
-    const items: CheckoutItem[] = cartItems.map((cartItem) => {
-      const unitPrice = new Prisma.Decimal(cartItem.product.price);
-      const lineTotal = unitPrice.mul(cartItem.quantity);
-
-      totalQuantity += cartItem.quantity;
-      subtotal = subtotal.add(lineTotal);
-
-      return {
-        productId: cartItem.productId,
-        quantity: cartItem.quantity,
-        unitPrice: Number(unitPrice),
-        lineTotal: Number(lineTotal),
-        product: {
-          id: cartItem.product.id,
-          image: cartItem.product.image,
-          name: cartItem.product.name,
-          description: cartItem.product.description,
-          categoryId: cartItem.product.categoryId,
-          category: {
-            id: cartItem.product.category.id,
-            image: cartItem.product.category.image,
-            name: cartItem.product.category.name,
-          },
-        },
-      };
-    });
-
-    const itemQuantityByProductId = new Map(
-      items.map((item) => [item.productId, item.quantity]),
-    );
-    const locationReceivedAt = new Date();
+    const items = await this.getPreparedCartItems(user.id);
+    const delivery = this.normalizeDelivery(dto);
 
     const order = await this.prisma.$transaction(async (transaction) => {
-      const orderNumber = await this.generateOrderNumber(transaction);
-
-      const createdOrder = await transaction.order.create({
-        data: {
-          orderNumber,
-          userId: user.id,
-          status: OrderStatus.NEW,
-          paymentStatus: PaymentStatus.PENDING,
-          locationSource: OrderLocationSource.MINI_APP,
+      const createdOrder = await this.createOrderRecord(transaction, {
+        userId: user.id,
+        createdByStaffId: null,
+        source: OrderSource.MINI_APP,
+        paymentStatus: PaymentStatus.PENDING,
+        location: {
+          source: OrderLocationSource.MINI_APP,
           latitude: dto.latitude,
           longitude: dto.longitude,
-          locationReceivedAt,
-          customerPhone: user.phone,
-          customerFirstName: user.firstName,
-          customerLastName: user.lastName,
-          addressLine,
-          entrance: this.normalizeOptionalText(dto.entrance),
-          floor: this.normalizeOptionalText(dto.floor),
-          apartment: this.normalizeOptionalText(dto.apartment),
-          note: this.normalizeOptionalText(dto.note),
-          subtotal,
-          deliveryFee: new Prisma.Decimal(0),
-          totalPrice: subtotal,
-          items: {
-            create: items.map((item) => ({
-              productId: item.productId,
-              productImage: item.product.image,
-              productName: item.product.name,
-              productDescription: item.product.description,
-              categoryId: item.product.categoryId,
-              categoryImage: item.product.category.image,
-              categoryName: item.product.category.name,
-              unitPrice: new Prisma.Decimal(item.unitPrice),
-              quantity: item.quantity,
-              lineTotal: new Prisma.Decimal(item.lineTotal),
-            })),
-          },
         },
-        include: {
-          items: {
-            orderBy: {
-              createdAt: 'asc',
-            },
-          },
+        customer: {
+          phone: user.phone,
+          firstName: user.firstName,
+          lastName: user.lastName,
         },
+        delivery,
+        items,
       });
 
-      const currentCartItems = await transaction.cartItem.findMany({
+      await transaction.cartItem.deleteMany({
         where: {
           userId: user.id,
-          productId: {
-            in: items.map((item) => item.productId),
-          },
         },
       });
-
-      for (const cartItem of currentCartItems) {
-        const checkoutQuantity = itemQuantityByProductId.get(
-          cartItem.productId,
-        );
-
-        if (!checkoutQuantity) {
-          continue;
-        }
-
-        if (cartItem.quantity > checkoutQuantity) {
-          await transaction.cartItem.update({
-            where: {
-              userId_productId: {
-                userId: user.id,
-                productId: cartItem.productId,
-              },
-            },
-            data: {
-              quantity: {
-                decrement: checkoutQuantity,
-              },
-            },
-          });
-          continue;
-        }
-
-        await transaction.cartItem.delete({
-          where: {
-            userId_productId: {
-              userId: user.id,
-              productId: cartItem.productId,
-            },
-          },
-        });
-      }
 
       return createdOrder;
     });
+
+    return this.toOrderResponse(order);
+  }
+
+  async createAdminOrder(
+    staffUser: PublicUser,
+    dto: CreateAdminOrderDto,
+  ): Promise<OrderResponse> {
+    const paymentStatus = dto.paymentStatus ?? PaymentStatus.PENDING;
+
+    if (paymentStatus === PaymentStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Order create vaqtida payment `CANCELLED` bo`lishi mumkin emas.',
+      );
+    }
+
+    const customerUserId = await this.resolveCustomerUserId(dto.customerUserId);
+    const items = await this.getPreparedRequestedItems(dto.items);
+    const delivery = this.normalizeDelivery(dto);
+
+    const order = await this.prisma.$transaction((transaction) =>
+      this.createOrderRecord(transaction, {
+        userId: customerUserId,
+        createdByStaffId: staffUser.id,
+        source: OrderSource.CASHIER_PANEL,
+        paymentStatus,
+        location: {
+          source: OrderLocationSource.ADMIN_PANEL,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+        },
+        customer: {
+          phone: this.normalizeCustomerPhone(dto.customerPhone),
+          firstName: this.normalizeRequiredText(
+            dto.customerFirstName,
+            'Mijoz ismi yuborilishi kerak.',
+          ),
+          lastName: this.normalizeRequiredText(
+            dto.customerLastName,
+            'Mijoz familiyasi yuborilishi kerak.',
+          ),
+        },
+        delivery,
+        items,
+      }),
+    );
 
     return this.toOrderResponse(order);
   }
@@ -472,6 +415,7 @@ export class OrdersService {
       userId: options?.userId,
       status: query.status,
       paymentStatus: query.paymentStatus,
+      source: query.source,
       OR: search
         ? [
             {
@@ -552,6 +496,265 @@ export class OrdersService {
     return order;
   }
 
+  private async getPreparedCartItems(
+    userId: string,
+  ): Promise<PreparedOrderItem[]> {
+    const cartItems = await this.prisma.cartItem.findMany({
+      where: {
+        userId,
+      },
+      include: {
+        product: {
+          include: {
+            category: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    if (cartItems.length === 0) {
+      throw new BadRequestException(
+        'Checkout qilish uchun savat bo`sh bo`lmasligi kerak.',
+      );
+    }
+
+    return cartItems.map((cartItem) =>
+      this.toPreparedOrderItem(cartItem.product, cartItem.quantity),
+    );
+  }
+
+  private async getPreparedRequestedItems(
+    rawItems: CreateAdminOrderDto['items'],
+  ): Promise<PreparedOrderItem[]> {
+    const quantityByProductId = new Map<string, number>();
+
+    for (const item of rawItems) {
+      const productId = item.productId.trim();
+
+      if (!productId) {
+        throw new BadRequestException('Product ID bo`sh bo`lishi mumkin emas.');
+      }
+
+      quantityByProductId.set(
+        productId,
+        (quantityByProductId.get(productId) ?? 0) + item.quantity,
+      );
+    }
+
+    const productIds = Array.from(quantityByProductId.keys());
+    const products = await this.prisma.product.findMany({
+      where: {
+        id: {
+          in: productIds,
+        },
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    if (products.length !== productIds.length) {
+      const productIdSet = new Set(products.map((product) => product.id));
+      const missingProductId = productIds.find(
+        (productId) => !productIdSet.has(productId),
+      );
+
+      throw new NotFoundException(
+        missingProductId
+          ? `Product topilmadi: ${missingProductId}.`
+          : 'Product topilmadi.',
+      );
+    }
+
+    const productById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+
+    return productIds.map((productId) => {
+      const product = productById.get(productId);
+
+      if (!product) {
+        throw new NotFoundException('Product topilmadi.');
+      }
+
+      return this.toPreparedOrderItem(
+        product,
+        quantityByProductId.get(productId) ?? 0,
+      );
+    });
+  }
+
+  private toPreparedOrderItem(
+    product: ProductWithCategory,
+    quantity: number,
+  ): PreparedOrderItem {
+    if (!product.isActive) {
+      throw new BadRequestException(
+        `\`${product.name}\` active emas. Order yaratishdan oldin productni tekshiring.`,
+      );
+    }
+
+    const unitPrice = new Prisma.Decimal(product.price);
+    const lineTotal = unitPrice.mul(quantity);
+
+    return {
+      productId: product.id,
+      quantity,
+      unitPrice: Number(unitPrice),
+      lineTotal: Number(lineTotal),
+      product: {
+        id: product.id,
+        image: product.image,
+        name: product.name,
+        description: product.description,
+        categoryId: product.categoryId,
+        category: {
+          id: product.category.id,
+          image: product.category.image,
+          name: product.category.name,
+        },
+      },
+    };
+  }
+
+  private async createOrderRecord(
+    transaction: Prisma.TransactionClient,
+    payload: OrderCreationPayload,
+  ): Promise<OrderWithItems> {
+    const orderNumber = await this.generateOrderNumber(transaction);
+    const locationReceivedAt = new Date();
+    let subtotal = new Prisma.Decimal(0);
+
+    for (const item of payload.items) {
+      subtotal = subtotal.add(new Prisma.Decimal(item.lineTotal));
+    }
+
+    return transaction.order.create({
+      data: {
+        orderNumber,
+        userId: payload.userId,
+        createdByStaffId: payload.createdByStaffId,
+        source: payload.source,
+        status: OrderStatus.NEW,
+        paymentStatus: payload.paymentStatus,
+        locationSource: payload.location.source,
+        latitude: payload.location.latitude,
+        longitude: payload.location.longitude,
+        locationReceivedAt,
+        customerPhone: payload.customer.phone,
+        customerFirstName: payload.customer.firstName,
+        customerLastName: payload.customer.lastName,
+        addressLine: payload.delivery.addressLine,
+        entrance: payload.delivery.entrance,
+        floor: payload.delivery.floor,
+        apartment: payload.delivery.apartment,
+        note: payload.delivery.note,
+        subtotal,
+        deliveryFee: new Prisma.Decimal(0),
+        totalPrice: subtotal,
+        items: {
+          create: payload.items.map((item) => ({
+            productId: item.productId,
+            productImage: item.product.image,
+            productName: item.product.name,
+            productDescription: item.product.description,
+            categoryId: item.product.categoryId,
+            categoryImage: item.product.category.image,
+            categoryName: item.product.category.name,
+            unitPrice: new Prisma.Decimal(item.unitPrice),
+            quantity: item.quantity,
+            lineTotal: new Prisma.Decimal(item.lineTotal),
+          })),
+        },
+      },
+      include: {
+        items: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+  }
+
+  private async resolveCustomerUserId(
+    rawCustomerUserId?: string,
+  ): Promise<string | null> {
+    const customerUserId = rawCustomerUserId?.trim();
+
+    if (!customerUserId) {
+      return null;
+    }
+
+    const customerUser = await this.prisma.user.findUnique({
+      where: {
+        id: customerUserId,
+      },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!customerUser) {
+      throw new NotFoundException('Mijoz user topilmadi.');
+    }
+
+    if (customerUser.role !== Role.USER) {
+      throw new BadRequestException(
+        'Customer user sifatida faqat oddiy user tanlanishi mumkin.',
+      );
+    }
+
+    return customerUser.id;
+  }
+
+  private normalizeDelivery(
+    dto: Pick<
+      CreateCheckoutDto,
+      'addressLine' | 'entrance' | 'floor' | 'apartment' | 'note'
+    >,
+  ): DeliveryPayload {
+    const addressLine = dto.addressLine.trim();
+
+    if (addressLine.length < 5) {
+      throw new BadRequestException(
+        'Yetkazib berish manzili kamida 5 ta belgidan iborat bo`lishi kerak.',
+      );
+    }
+
+    return {
+      addressLine,
+      entrance: this.normalizeOptionalText(dto.entrance),
+      floor: this.normalizeOptionalText(dto.floor),
+      apartment: this.normalizeOptionalText(dto.apartment),
+      note: this.normalizeOptionalText(dto.note),
+    };
+  }
+
+  private normalizeCustomerPhone(rawPhone: string): string {
+    try {
+      return normalizeUzbekPhoneNumber(rawPhone);
+    } catch {
+      throw new BadRequestException(
+        'Mijoz telefoni 9 xonali formatda yuborilishi kerak.',
+      );
+    }
+  }
+
+  private normalizeRequiredText(value: string, errorMessage: string): string {
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue) {
+      throw new BadRequestException(errorMessage);
+    }
+
+    return normalizedValue;
+  }
+
   private async generateOrderNumber(
     client: OrderNumberClient,
   ): Promise<string> {
@@ -605,6 +808,7 @@ export class OrdersService {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
+      source: order.source,
       status: order.status,
       paymentStatus: order.paymentStatus,
       customer: {

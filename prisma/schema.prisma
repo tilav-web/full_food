@@ -28,8 +28,13 @@ enum PaymentStatus {
 }
 
 enum OrderLocationSource {
-  BOT_LOCATION
   MINI_APP
+  ADMIN_PANEL
+}
+
+enum OrderSource {
+  MINI_APP
+  CASHIER_PANEL
 }
 
 model User {
@@ -43,7 +48,8 @@ model User {
   lastName         String   @default("-")
   role             Role     @default(USER)
   cartItems        CartItem[]
-  orders           Order[]
+  orders           Order[]  @relation("CustomerOrders")
+  createdOrders    Order[]  @relation("StaffCreatedOrders")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -91,7 +97,9 @@ model CartItem {
 model Order {
   id                 String              @id @default(cuid())
   orderNumber        String              @unique
-  userId             String
+  userId             String?
+  createdByStaffId   String?
+  source             OrderSource         @default(MINI_APP)
   status             OrderStatus         @default(NEW)
   paymentStatus      PaymentStatus       @default(PENDING)
   locationSource     OrderLocationSource @default(MINI_APP)
@@ -110,12 +118,15 @@ model Order {
   subtotal           Decimal
   deliveryFee        Decimal             @default(0)
   totalPrice         Decimal
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User?               @relation("CustomerOrders", fields: [userId], references: [id], onDelete: SetNull)
+  createdByStaff     User?               @relation("StaffCreatedOrders", fields: [createdByStaffId], references: [id], onDelete: SetNull)
   items              OrderItem[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   @@index([userId, createdAt])
+  @@index([createdByStaffId, createdAt])
+  @@index([source, createdAt])
   @@index([status])
   @@index([paymentStatus])
   @@index([customerPhone])

@@ -1,5 +1,6 @@
 import {
   OrderLocationSource,
+  OrderSource,
   OrderStatus,
   PaymentStatus,
   Role,
@@ -619,6 +620,12 @@ export class OrderResponseDoc {
     example: 'FF-20260409-654321',
   })
   orderNumber!: string;
+
+  @ApiProperty({
+    enum: OrderSource,
+    example: OrderSource.MINI_APP,
+  })
+  source!: OrderSource;
 
   @ApiProperty({
     enum: OrderStatus,

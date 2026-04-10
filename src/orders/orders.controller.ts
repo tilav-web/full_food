@@ -11,12 +11,14 @@ import {
 import { Role } from '@prisma/client';
 import {
   ApiBadRequestResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
 import { CurrentTelegramUser } from '../auth/decorators/current-telegram-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -29,6 +31,7 @@ import {
 } from '../docs/swagger.decorators';
 import { OrderListResponseDoc, OrderResponseDoc } from '../docs/swagger.models';
 import type { PublicUser } from '../users/users.service';
+import { CreateAdminOrderDto } from './dto/create-admin-order.dto';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -62,6 +65,35 @@ export class OrdersController {
     @Body() dto: CreateCheckoutDto,
   ) {
     return this.ordersService.checkout(user, dto);
+  }
+
+  @Post('admin-create')
+  @Roles(Role.SUPER_ADMIN, Role.CASHIER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
+  @ApiOperation({
+    summary: 'Admin paneldan buyurtma yaratish',
+    description:
+      'Kassir yoki admin customer ma`lumotlari, itemlar va delivery location bilan order yaratadi.',
+  })
+  @ApiOkResponse({
+    type: OrderResponseDoc,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Bearer access token yuborilmagan yoki noto`g`ri.',
+  })
+  @ApiForbiddenResponse({
+    description: 'Faqat SUPER_ADMIN yoki CASHIER uchun.',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Customer ma`lumoti, payment status yoki itemlar bo`yicha validation xatosi.',
+  })
+  createAdminOrder(
+    @CurrentAuthUser() user: PublicUser,
+    @Body() dto: CreateAdminOrderDto,
+  ) {
+    return this.ordersService.createAdminOrder(user, dto);
   }
 
   @Get('me')
