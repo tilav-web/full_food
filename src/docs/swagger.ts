@@ -30,7 +30,7 @@ export function setupSwagger(app: INestApplication) {
     .addTag('Cart', 'Foydalanuvchi savati va cart summary endpointlari')
     .addTag(
       'Orders',
-      'Redis checkout draft, Telegram location finalize va order management endpointlari',
+      'Mini App checkout, frontend location va order management endpointlari',
     )
     .addApiKey(
       {

@@ -1,7 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsLatitude,
+  IsLongitude,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
-export class CreateCheckoutDraftDto {
+export class CreateCheckoutDto {
   @ApiProperty({
     example: 'Toshkent shahar, Chilonzor 5-daha, 12-uy',
     description: 'Buyurtma yetkazib beriladigan asosiy manzil.',
@@ -42,4 +49,18 @@ export class CreateCheckoutDraftDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  @ApiProperty({
+    example: 41.311081,
+    description: 'Mini App frontendi yuboradigan latitude qiymati.',
+  })
+  @IsLatitude()
+  latitude!: number;
+
+  @ApiProperty({
+    example: 69.240562,
+    description: 'Mini App frontendi yuboradigan longitude qiymati.',
+  })
+  @IsLongitude()
+  longitude!: number;
 }

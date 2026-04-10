@@ -12,17 +12,15 @@ import {
   PaymentStatus,
   Prisma,
 } from '@prisma/client';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import type { PublicUser } from '../users/users.service';
-import { DEFAULT_ORDER_DRAFT_TTL_SECONDS } from './order.constants';
-import { CreateCheckoutDraftDto } from './dto/create-checkout-draft.dto';
+import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
 
-type CheckoutDraftItem = {
+type CheckoutItem = {
   productId: string;
   quantity: number;
   unitPrice: number;
@@ -39,49 +37,6 @@ type CheckoutDraftItem = {
       name: string;
     };
   };
-};
-
-type CheckoutDraftPayload = {
-  draftId: string;
-  userId: string;
-  telegramId: string;
-  customer: {
-    phone: string;
-    firstName: string;
-    lastName: string;
-  };
-  delivery: {
-    addressLine: string;
-    entrance: string | null;
-    floor: string | null;
-    apartment: string | null;
-    note: string | null;
-  };
-  items: CheckoutDraftItem[];
-  summary: {
-    totalItems: number;
-    totalQuantity: number;
-    subtotal: number;
-    deliveryFee: number;
-    totalPrice: number;
-  };
-  createdAt: string;
-  expiresAt: string;
-};
-
-type CheckoutDraftResponse = {
-  draftId: string;
-  status: 'WAITING_LOCATION';
-  expiresAt: Date;
-  locationRequestSent: boolean;
-  customer: CheckoutDraftPayload['customer'];
-  delivery: CheckoutDraftPayload['delivery'];
-  items: CheckoutDraftItem[];
-  summary: CheckoutDraftPayload['summary'];
-};
-
-type CheckoutDraftEnvelope = {
-  draft: CheckoutDraftResponse | null;
 };
 
 type OrderResponse = {
@@ -144,18 +99,6 @@ type PaginatedOrdersResponse = {
   };
 };
 
-type FinalizeDraftResult =
-  | {
-      type: 'created';
-      order: OrderResponse;
-    }
-  | {
-      type: 'not_found';
-    }
-  | {
-      type: 'processing';
-    };
-
 type OrderWithItems = Order & {
   items: OrderItem[];
 };
@@ -164,29 +107,12 @@ type OrderNumberClient = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class OrdersService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createCheckoutDraft(
+  async checkout(
     user: PublicUser,
-    dto: CreateCheckoutDraftDto,
-  ): Promise<CheckoutDraftResponse> {
-    const telegramId = user.telegramId?.trim();
-
-    if (!telegramId) {
-      throw new BadRequestException(
-        'Checkout uchun Telegram akkaunti tizimga bog`langan bo`lishi kerak.',
-      );
-    }
-
-    const existingDraft = await this.findActiveDraftByTelegramId(telegramId);
-
-    if (existingDraft) {
-      return this.toCheckoutDraftResponse(existingDraft);
-    }
-
+    dto: CreateCheckoutDto,
+  ): Promise<OrderResponse> {
     const cartItems = await this.prisma.cartItem.findMany({
       where: {
         userId: user.id,
@@ -219,10 +145,18 @@ export class OrdersService {
       );
     }
 
+    const addressLine = dto.addressLine.trim();
+
+    if (addressLine.length < 5) {
+      throw new BadRequestException(
+        'Yetkazib berish manzili kamida 5 ta belgidan iborat bo`lishi kerak.',
+      );
+    }
+
     let totalQuantity = 0;
     let subtotal = new Prisma.Decimal(0);
 
-    const items = cartItems.map((cartItem) => {
+    const items: CheckoutItem[] = cartItems.map((cartItem) => {
       const unitPrice = new Prisma.Decimal(cartItem.product.price);
       const lineTotal = unitPrice.mul(cartItem.quantity);
 
@@ -249,228 +183,108 @@ export class OrdersService {
       };
     });
 
-    const createdAt = new Date();
-    const expiresAt = new Date(
-      createdAt.getTime() + this.getDraftTtlSeconds() * 1000,
+    const itemQuantityByProductId = new Map(
+      items.map((item) => [item.productId, item.quantity]),
     );
-    const draft: CheckoutDraftPayload = {
-      draftId: randomUUID(),
-      userId: user.id,
-      telegramId,
-      customer: {
-        phone: user.phone,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-      delivery: {
-        addressLine: dto.addressLine.trim(),
-        entrance: this.normalizeOptionalText(dto.entrance),
-        floor: this.normalizeOptionalText(dto.floor),
-        apartment: this.normalizeOptionalText(dto.apartment),
-        note: this.normalizeOptionalText(dto.note),
-      },
-      items,
-      summary: {
-        totalItems: items.length,
-        totalQuantity,
-        subtotal: Number(subtotal),
-        deliveryFee: 0,
-        totalPrice: Number(subtotal),
-      },
-      createdAt: createdAt.toISOString(),
-      expiresAt: expiresAt.toISOString(),
-    };
+    const locationReceivedAt = new Date();
 
-    await this.saveDraft(draft);
+    const order = await this.prisma.$transaction(async (transaction) => {
+      const orderNumber = await this.generateOrderNumber(transaction);
 
-    return this.toCheckoutDraftResponse(draft);
-  }
+      const createdOrder = await transaction.order.create({
+        data: {
+          orderNumber,
+          userId: user.id,
+          status: OrderStatus.NEW,
+          paymentStatus: PaymentStatus.PENDING,
+          locationSource: OrderLocationSource.MINI_APP,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          locationReceivedAt,
+          customerPhone: user.phone,
+          customerFirstName: user.firstName,
+          customerLastName: user.lastName,
+          addressLine,
+          entrance: this.normalizeOptionalText(dto.entrance),
+          floor: this.normalizeOptionalText(dto.floor),
+          apartment: this.normalizeOptionalText(dto.apartment),
+          note: this.normalizeOptionalText(dto.note),
+          subtotal,
+          deliveryFee: new Prisma.Decimal(0),
+          totalPrice: subtotal,
+          items: {
+            create: items.map((item) => ({
+              productId: item.productId,
+              productImage: item.product.image,
+              productName: item.product.name,
+              productDescription: item.product.description,
+              categoryId: item.product.categoryId,
+              categoryImage: item.product.category.image,
+              categoryName: item.product.category.name,
+              unitPrice: new Prisma.Decimal(item.unitPrice),
+              quantity: item.quantity,
+              lineTotal: new Prisma.Decimal(item.lineTotal),
+            })),
+          },
+        },
+        include: {
+          items: {
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
+      });
 
-  async getActiveCheckoutDraft(
-    user: PublicUser,
-  ): Promise<CheckoutDraftEnvelope> {
-    const telegramId = user.telegramId?.trim();
+      const currentCartItems = await transaction.cartItem.findMany({
+        where: {
+          userId: user.id,
+          productId: {
+            in: items.map((item) => item.productId),
+          },
+        },
+      });
 
-    if (!telegramId) {
-      return { draft: null };
-    }
-
-    const draft = await this.findActiveDraftByTelegramId(telegramId);
-
-    return {
-      draft: draft ? this.toCheckoutDraftResponse(draft) : null,
-    };
-  }
-
-  async cancelActiveCheckoutDraft(
-    user: PublicUser,
-  ): Promise<{ message: string }> {
-    const telegramId = user.telegramId?.trim();
-
-    if (!telegramId) {
-      return {
-        message: 'Aktiv checkout draft topilmadi.',
-      };
-    }
-
-    const draft = await this.findActiveDraftByTelegramId(telegramId);
-
-    if (!draft) {
-      return {
-        message: 'Aktiv checkout draft topilmadi.',
-      };
-    }
-
-    await this.deleteDraft(draft.draftId, draft.telegramId);
-
-    return {
-      message: 'Checkout draft bekor qilindi.',
-    };
-  }
-
-  async finalizeDraftFromTelegramLocation(
-    telegramId: string,
-    location: {
-      latitude: number;
-      longitude: number;
-    },
-  ): Promise<FinalizeDraftResult> {
-    const normalizedTelegramId = telegramId.trim();
-    const draft = await this.findActiveDraftByTelegramId(normalizedTelegramId);
-
-    if (!draft) {
-      return {
-        type: 'not_found',
-      };
-    }
-
-    const lockKey = this.getDraftLockKey(draft.draftId);
-    const isLocked = await this.redisService.setIfNotExists(lockKey, '1', 30);
-
-    if (!isLocked) {
-      return {
-        type: 'processing',
-      };
-    }
-
-    try {
-      const freshDraft =
-        await this.findActiveDraftByTelegramId(normalizedTelegramId);
-
-      if (!freshDraft) {
-        return {
-          type: 'not_found',
-        };
-      }
-
-      const order = await this.prisma.$transaction(async (transaction) => {
-        const orderNumber = await this.generateOrderNumber(transaction);
-        const draftQuantityByProductId = new Map(
-          freshDraft.items.map((item) => [item.productId, item.quantity]),
+      for (const cartItem of currentCartItems) {
+        const checkoutQuantity = itemQuantityByProductId.get(
+          cartItem.productId,
         );
 
-        const createdOrder = await transaction.order.create({
-          data: {
-            orderNumber,
-            userId: freshDraft.userId,
-            status: OrderStatus.NEW,
-            paymentStatus: PaymentStatus.PENDING,
-            locationSource: OrderLocationSource.BOT_LOCATION,
-            latitude: location.latitude,
-            longitude: location.longitude,
-            locationReceivedAt: new Date(),
-            customerPhone: freshDraft.customer.phone,
-            customerFirstName: freshDraft.customer.firstName,
-            customerLastName: freshDraft.customer.lastName,
-            addressLine: freshDraft.delivery.addressLine,
-            entrance: freshDraft.delivery.entrance,
-            floor: freshDraft.delivery.floor,
-            apartment: freshDraft.delivery.apartment,
-            note: freshDraft.delivery.note,
-            subtotal: new Prisma.Decimal(freshDraft.summary.subtotal),
-            deliveryFee: new Prisma.Decimal(freshDraft.summary.deliveryFee),
-            totalPrice: new Prisma.Decimal(freshDraft.summary.totalPrice),
-            items: {
-              create: freshDraft.items.map((item) => ({
-                productId: item.productId,
-                productImage: item.product.image,
-                productName: item.product.name,
-                productDescription: item.product.description,
-                categoryId: item.product.categoryId,
-                categoryImage: item.product.category.image,
-                categoryName: item.product.category.name,
-                unitPrice: new Prisma.Decimal(item.unitPrice),
-                quantity: item.quantity,
-                lineTotal: new Prisma.Decimal(item.lineTotal),
-              })),
-            },
-          },
-          include: {
-            items: {
-              orderBy: {
-                createdAt: 'asc',
-              },
-            },
-          },
-        });
+        if (!checkoutQuantity) {
+          continue;
+        }
 
-        const currentCartItems = await transaction.cartItem.findMany({
-          where: {
-            userId: freshDraft.userId,
-            productId: {
-              in: freshDraft.items.map((item) => item.productId),
-            },
-          },
-        });
-
-        for (const cartItem of currentCartItems) {
-          const draftQuantity = draftQuantityByProductId.get(
-            cartItem.productId,
-          );
-
-          if (!draftQuantity) {
-            continue;
-          }
-
-          if (cartItem.quantity > draftQuantity) {
-            await transaction.cartItem.update({
-              where: {
-                userId_productId: {
-                  userId: freshDraft.userId,
-                  productId: cartItem.productId,
-                },
-              },
-              data: {
-                quantity: {
-                  decrement: draftQuantity,
-                },
-              },
-            });
-            continue;
-          }
-
-          await transaction.cartItem.delete({
+        if (cartItem.quantity > checkoutQuantity) {
+          await transaction.cartItem.update({
             where: {
               userId_productId: {
-                userId: freshDraft.userId,
+                userId: user.id,
                 productId: cartItem.productId,
               },
             },
+            data: {
+              quantity: {
+                decrement: checkoutQuantity,
+              },
+            },
           });
+          continue;
         }
 
-        return createdOrder;
-      });
+        await transaction.cartItem.delete({
+          where: {
+            userId_productId: {
+              userId: user.id,
+              productId: cartItem.productId,
+            },
+          },
+        });
+      }
 
-      await this.deleteDraft(freshDraft.draftId, freshDraft.telegramId);
+      return createdOrder;
+    });
 
-      return {
-        type: 'created',
-        order: this.toOrderResponse(order),
-      };
-    } finally {
-      await this.redisService.delete(lockKey);
-    }
+    return this.toOrderResponse(order);
   }
 
   async listMyOrders(
@@ -787,73 +601,6 @@ export class OrdersService {
     }
   }
 
-  private async saveDraft(draft: CheckoutDraftPayload): Promise<void> {
-    const ttlSeconds = this.getDraftTtlSeconds();
-
-    await this.redisService.set(
-      this.getDraftKey(draft.draftId),
-      JSON.stringify(draft),
-      ttlSeconds,
-    );
-    await this.redisService.set(
-      this.getActiveDraftKey(draft.telegramId),
-      draft.draftId,
-      ttlSeconds,
-    );
-  }
-
-  private async findActiveDraftByTelegramId(
-    telegramId: string,
-  ): Promise<CheckoutDraftPayload | null> {
-    const draftId = await this.redisService.get(
-      this.getActiveDraftKey(telegramId),
-    );
-
-    if (!draftId) {
-      return null;
-    }
-
-    const rawDraft = await this.redisService.get(this.getDraftKey(draftId));
-
-    if (!rawDraft) {
-      await this.redisService.delete(this.getActiveDraftKey(telegramId));
-      return null;
-    }
-
-    try {
-      return JSON.parse(rawDraft) as CheckoutDraftPayload;
-    } catch {
-      await this.deleteDraft(draftId, telegramId);
-      return null;
-    }
-  }
-
-  private async deleteDraft(
-    draftId: string,
-    telegramId: string,
-  ): Promise<void> {
-    await this.redisService.delete(
-      this.getDraftKey(draftId),
-      this.getActiveDraftKey(telegramId),
-      this.getDraftLockKey(draftId),
-    );
-  }
-
-  private toCheckoutDraftResponse(
-    draft: CheckoutDraftPayload,
-  ): CheckoutDraftResponse {
-    return {
-      draftId: draft.draftId,
-      status: 'WAITING_LOCATION',
-      expiresAt: new Date(draft.expiresAt),
-      locationRequestSent: false,
-      customer: draft.customer,
-      delivery: draft.delivery,
-      items: draft.items,
-      summary: draft.summary,
-    };
-  }
-
   private toOrderResponse(order: OrderWithItems): OrderResponse {
     return {
       id: order.id,
@@ -907,28 +654,6 @@ export class OrdersService {
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
-  }
-
-  private getDraftTtlSeconds(): number {
-    const rawValue = Number(process.env.ORDER_DRAFT_TTL_SECONDS);
-
-    if (Number.isFinite(rawValue) && rawValue > 0) {
-      return rawValue;
-    }
-
-    return DEFAULT_ORDER_DRAFT_TTL_SECONDS;
-  }
-
-  private getDraftKey(draftId: string): string {
-    return `order:draft:${draftId}`;
-  }
-
-  private getActiveDraftKey(telegramId: string): string {
-    return `order:draft:active:${telegramId}`;
-  }
-
-  private getDraftLockKey(draftId: string): string {
-    return `order:draft:lock:${draftId}`;
   }
 
   private normalizeOptionalText(value?: string): string | null {

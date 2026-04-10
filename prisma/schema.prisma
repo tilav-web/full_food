@@ -29,6 +29,7 @@ enum PaymentStatus {
 
 enum OrderLocationSource {
   BOT_LOCATION
+  MINI_APP
 }
 
 model User {
@@ -93,7 +94,7 @@ model Order {
   userId             String
   status             OrderStatus         @default(NEW)
   paymentStatus      PaymentStatus       @default(PENDING)
-  locationSource     OrderLocationSource @default(BOT_LOCATION)
+  locationSource     OrderLocationSource @default(MINI_APP)
   latitude           Float
   longitude          Float
   locationReceivedAt DateTime

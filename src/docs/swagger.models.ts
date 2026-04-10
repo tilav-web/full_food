@@ -521,7 +521,7 @@ export class OrderDeliveryDoc extends CheckoutDraftDeliveryDoc {}
 export class OrderLocationDoc {
   @ApiProperty({
     enum: OrderLocationSource,
-    example: OrderLocationSource.BOT_LOCATION,
+    example: OrderLocationSource.MINI_APP,
   })
   source!: OrderLocationSource;
 

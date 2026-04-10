@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -12,7 +11,6 @@ import {
 import { Role } from '@prisma/client';
 import {
   ApiBadRequestResponse,
-  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -25,20 +23,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RegisteredUserGuard } from '../auth/guards/registered-user.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
-import { BotService } from '../bot/bot.service';
 import {
   ApiTelegramInitDataAuth,
   ApiWebBearerAuth,
 } from '../docs/swagger.decorators';
-import {
-  CheckoutDraftEnvelopeDoc,
-  CheckoutDraftMessageResponseDoc,
-  CheckoutDraftResponseDoc,
-  OrderListResponseDoc,
-  OrderResponseDoc,
-} from '../docs/swagger.models';
+import { OrderListResponseDoc, OrderResponseDoc } from '../docs/swagger.models';
 import type { PublicUser } from '../users/users.service';
-import { CreateCheckoutDraftDto } from './dto/create-checkout-draft.dto';
+import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
@@ -47,75 +38,30 @@ import { OrdersService } from './orders.service';
 @Controller('orders')
 @ApiTags('Orders')
 export class OrdersController {
-  constructor(
-    private readonly ordersService: OrdersService,
-    private readonly botService: BotService,
-  ) {}
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
   @UseGuards(TelegramAuthGuard, RegisteredUserGuard)
   @ApiTelegramInitDataAuth()
   @ApiOperation({
-    summary: 'Checkout draft yaratish',
+    summary: 'Buyurtma yaratish',
     description:
-      'Savat snapshoti Redis`da vaqtinchalik saqlanadi. Shundan keyin bot userdan location so`raydi.',
+      'Mini App frontend savat bilan birga delivery ma`lumotlari va location koordinatalarini yuboradi. Order shu zahoti yaratiladi.',
   })
   @ApiOkResponse({
-    type: CheckoutDraftResponseDoc,
+    type: OrderResponseDoc,
   })
   @ApiUnauthorizedResponse({
     description: 'Telegram initData yuborilmagan yoki noto`g`ri.',
   })
-  @ApiForbiddenResponse({
-    description: 'Foydalanuvchi bot orqali ro`yxatdan o`tgan bo`lishi kerak.',
-  })
   @ApiBadRequestResponse({
     description: 'Savat bo`sh yoki active bo`lmagan product mavjud.',
   })
-  async createCheckoutDraft(
+  checkout(
     @CurrentTelegramUser() user: PublicUser,
-    @Body() dto: CreateCheckoutDraftDto,
+    @Body() dto: CreateCheckoutDto,
   ) {
-    const draft = await this.ordersService.createCheckoutDraft(user, dto);
-    const locationRequestSent =
-      user.telegramId === null
-        ? false
-        : await this.botService.sendOrderLocationRequest(user.telegramId, {
-            addressLine: draft.delivery.addressLine,
-            expiresAt: draft.expiresAt,
-            totalPrice: draft.summary.totalPrice,
-          });
-
-    return {
-      ...draft,
-      locationRequestSent,
-    };
-  }
-
-  @Get('checkout-draft')
-  @UseGuards(TelegramAuthGuard, RegisteredUserGuard)
-  @ApiTelegramInitDataAuth()
-  @ApiOperation({
-    summary: 'Aktiv checkout draftni olish',
-  })
-  @ApiOkResponse({
-    type: CheckoutDraftEnvelopeDoc,
-  })
-  getActiveCheckoutDraft(@CurrentTelegramUser() user: PublicUser) {
-    return this.ordersService.getActiveCheckoutDraft(user);
-  }
-
-  @Delete('checkout-draft')
-  @UseGuards(TelegramAuthGuard, RegisteredUserGuard)
-  @ApiTelegramInitDataAuth()
-  @ApiOperation({
-    summary: 'Aktiv checkout draftni bekor qilish',
-  })
-  @ApiOkResponse({
-    type: CheckoutDraftMessageResponseDoc,
-  })
-  cancelActiveCheckoutDraft(@CurrentTelegramUser() user: PublicUser) {
-    return this.ordersService.cancelActiveCheckoutDraft(user);
+    return this.ordersService.checkout(user, dto);
   }
 
   @Get('me')
