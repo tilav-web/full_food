@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
@@ -10,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import { Bot, Keyboard } from 'grammy';
 import { UsersService } from '../users/users.service';
+import { BroadcastMessageDto } from './dto/broadcast-message.dto';
 
 @Injectable()
 export class BotService implements OnModuleInit, OnModuleDestroy {
@@ -56,15 +58,87 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     void this.bot?.stop();
   }
 
+  async broadcastMessage(dto: BroadcastMessageDto): Promise<{
+    totalRecipients: number;
+    successCount: number;
+    failedCount: number;
+    deactivatedCount: number;
+  }> {
+    if (!this.bot) {
+      throw new InternalServerErrorException('Bot ishga tushmagan.');
+    }
+
+    const recipients = await this.usersService.listActiveBotRecipients({
+      role: dto.role,
+    });
+
+    let successCount = 0;
+    let failedCount = 0;
+    let deactivatedCount = 0;
+
+    for (const recipient of recipients) {
+      try {
+        await this.bot.api.sendMessage(
+          Number(recipient.telegramId),
+          dto.message,
+        );
+        successCount += 1;
+      } catch (error) {
+        failedCount += 1;
+
+        if (this.isChatUnavailableError(error)) {
+          deactivatedCount += 1;
+          await this.usersService.updateBotActiveStatusByTelegramId(
+            recipient.telegramId,
+            false,
+          );
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Telegram user ${recipient.telegramId} ga broadcast yuborilmadi: ${message}`,
+        );
+      }
+    }
+
+    return {
+      totalRecipients: recipients.length,
+      successCount,
+      failedCount,
+      deactivatedCount,
+    };
+  }
+
   private registerHandlers() {
     if (!this.bot) {
       return;
     }
 
+    this.bot.on('my_chat_member', async (ctx) => {
+      const update = ctx.update.my_chat_member;
+
+      if (!update || update.chat.type !== 'private') {
+        return;
+      }
+
+      const status = update.new_chat_member.status;
+      const isBotActive = !['left', 'kicked'].includes(status);
+
+      await this.usersService.updateBotActiveStatusByTelegramId(
+        String(update.chat.id),
+        isBotActive,
+      );
+    });
+
     this.bot.command('start', async (ctx) => {
       const telegramId = ctx.from?.id ? String(ctx.from.id) : null;
 
       if (telegramId) {
+        await this.usersService.updateBotActiveStatusByTelegramId(
+          telegramId,
+          true,
+        );
+
         const existingUser =
           await this.usersService.findPublicByTelegramId(telegramId);
 
@@ -148,6 +222,13 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.on('message:text', async (ctx) => {
+      if (ctx.from?.id) {
+        await this.usersService.updateBotActiveStatusByTelegramId(
+          String(ctx.from.id),
+          true,
+        );
+      }
+
       if (ctx.message.text.startsWith('/start')) {
         return;
       }
@@ -173,6 +254,27 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
       this.configService.get<string>('BOT_POLLING_ENABLED') ?? 'true';
 
     return !['false', '0', 'no', 'off'].includes(rawValue.toLowerCase());
+  }
+
+  private isChatUnavailableError(error: unknown): boolean {
+    const errorObject = error as {
+      error_code?: number;
+      description?: string;
+      message?: string;
+    };
+    const description = (
+      errorObject.description ??
+      errorObject.message ??
+      ''
+    ).toLowerCase();
+
+    return (
+      errorObject.error_code === 403 ||
+      description.includes('bot was blocked by the user') ||
+      description.includes('chat not found') ||
+      description.includes('user is deactivated') ||
+      description.includes('bot was kicked')
+    );
   }
 
   private formatRole(role: Role): string {

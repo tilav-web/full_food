@@ -47,6 +47,11 @@ export class PublicUserResponseDoc {
   telegramUsername!: string | null;
 
   @ApiProperty({
+    example: true,
+  })
+  isBotActive!: boolean;
+
+  @ApiProperty({
     example: '777422302',
   })
   phone!: string;
@@ -66,6 +71,11 @@ export class PublicUserResponseDoc {
     example: Role.USER,
   })
   role!: Role;
+
+  @ApiProperty({
+    example: true,
+  })
+  hasPassword!: boolean;
 
   @ApiProperty({
     example: '2026-04-09T05:14:46.814Z',
@@ -246,6 +256,40 @@ export class PaginationMetaDoc {
     example: 3,
   })
   totalPages!: number;
+}
+
+export class UserListResponseDoc {
+  @ApiProperty({
+    type: () => [PublicUserResponseDoc],
+  })
+  data!: PublicUserResponseDoc[];
+
+  @ApiProperty({
+    type: () => PaginationMetaDoc,
+  })
+  meta!: PaginationMetaDoc;
+}
+
+export class BroadcastResultResponseDoc {
+  @ApiProperty({
+    example: 120,
+  })
+  totalRecipients!: number;
+
+  @ApiProperty({
+    example: 115,
+  })
+  successCount!: number;
+
+  @ApiProperty({
+    example: 5,
+  })
+  failedCount!: number;
+
+  @ApiProperty({
+    example: 3,
+  })
+  deactivatedCount!: number;
 }
 
 export class ProductListResponseDoc {
