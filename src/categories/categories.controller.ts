@@ -62,6 +62,27 @@ export class CategoriesController {
     return this.categoriesService.findAll(query);
   }
 
+  @Get(':id')
+  @UseGuards(HybridAuthGuard)
+  @ApiTelegramInitDataAuth()
+  @ApiWebBearerAuth()
+  @ApiOperation({
+    summary: 'Category ni ID bo`yicha olish',
+  })
+  @ApiParam({
+    name: 'id',
+    example: 'cmnzd2aqf0001p6f0s2lm8abc',
+  })
+  @ApiOkResponse({
+    type: CategoryResponseDoc,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Kerakli auth yuborilmagan yoki noto'g'ri.",
+  })
+  findById(@Param('id') id: string) {
+    return this.categoriesService.findById(id);
+  }
+
   @Post()
   @Roles(Role.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)

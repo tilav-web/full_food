@@ -53,6 +53,11 @@ export class CategoriesService {
     return categories.map((category) => this.toResponse(category));
   }
 
+  async findById(id: string): Promise<CategoryResponse> {
+    const category = await this.findOneOrThrow(id);
+    return this.toResponse(category);
+  }
+
   async findOneOrThrow(id: string): Promise<Category> {
     const category = await this.prisma.category.findUnique({
       where: { id },
