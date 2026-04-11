@@ -18,16 +18,11 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import {
-  ApiTelegramInitDataAuth,
-  ApiWebBearerAuth,
-} from '../docs/swagger.decorators';
+import { ApiWebBearerAuth } from '../docs/swagger.decorators';
 import {
   CategoryResponseDoc,
   MessageResponseDoc,
@@ -43,29 +38,19 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
-  @UseGuards(HybridAuthGuard)
-  @ApiTelegramInitDataAuth()
-  @ApiWebBearerAuth()
   @ApiOperation({
     summary: "Category ro'yxatini olish",
-    description:
-      'Categorylarni qidiruv bilan olish endpointi. Mini App user `x-telegram-init-data`, web admin esa `Bearer` token bilan kira oladi.',
+    description: 'Categorylarni qidiruv bilan olish endpointi.',
   })
   @ApiOkResponse({
     type: CategoryResponseDoc,
     isArray: true,
-  })
-  @ApiUnauthorizedResponse({
-    description: "Kerakli auth yuborilmagan yoki noto'g'ri.",
   })
   findAll(@Query() query: ListCategoriesQueryDto) {
     return this.categoriesService.findAll(query);
   }
 
   @Get(':id')
-  @UseGuards(HybridAuthGuard)
-  @ApiTelegramInitDataAuth()
-  @ApiWebBearerAuth()
   @ApiOperation({
     summary: 'Category ni ID bo`yicha olish',
   })
@@ -75,9 +60,6 @@ export class CategoriesController {
   })
   @ApiOkResponse({
     type: CategoryResponseDoc,
-  })
-  @ApiUnauthorizedResponse({
-    description: "Kerakli auth yuborilmagan yoki noto'g'ri.",
   })
   findById(@Param('id') id: string) {
     return this.categoriesService.findById(id);
