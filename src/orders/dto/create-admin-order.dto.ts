@@ -6,6 +6,8 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsLatitude,
+  IsLongitude,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -13,7 +15,6 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { CreateCheckoutDto } from './create-checkout.dto';
 
 export class CreateAdminOrderItemDto {
   @ApiProperty({
@@ -33,54 +34,77 @@ export class CreateAdminOrderItemDto {
   quantity!: number;
 }
 
-export class CreateAdminOrderDto extends CreateCheckoutDto {
-  @ApiPropertyOptional({
-    example: 'cmnr0w2hq0000p60d15udg25w',
-    description:
-      'Agar buyurtma tizimdagi ro`yxatdan o`tgan mijozga tegishli bo`lsa, uning user ID si yuboriladi.',
-  })
+export class CreateAdminOrderDto {
+  @ApiPropertyOptional({ example: 'cmnr0w2hq0000p60d15udg25w' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   customerUserId?: string;
 
-  @ApiProperty({
-    example: '777422302',
-    description: 'Mijoz telefoni 9 xonali formatda yuboriladi.',
-  })
+  @ApiPropertyOptional({ example: '777422302' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  customerPhone!: string;
+  @MaxLength(20)
+  customerPhone?: string;
 
-  @ApiProperty({
-    example: 'Ali',
-  })
+  @ApiPropertyOptional({ example: 'Ali' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  customerFirstName!: string;
+  customerFirstName?: string;
 
-  @ApiProperty({
-    example: 'Valiyev',
-  })
+  @ApiPropertyOptional({ example: 'Valiyev' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  customerLastName!: string;
+  customerLastName?: string;
 
-  @ApiPropertyOptional({
-    enum: PaymentStatus,
-    example: PaymentStatus.PAID,
-    description:
-      '`PENDING` yoki `PAID` yuboriladi. `CANCELLED` create vaqtida qabul qilinmaydi.',
-  })
+  @ApiPropertyOptional({ example: 'Restoran ichida' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  addressLine?: string;
+
+  @ApiPropertyOptional({ example: '2-podyezd' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  entrance?: string;
+
+  @ApiPropertyOptional({ example: '4-qavat' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  floor?: string;
+
+  @ApiPropertyOptional({ example: '27-xonadon' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  apartment?: string;
+
+  @ApiPropertyOptional({ example: 'Izoh' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @ApiPropertyOptional({ example: 41.311081 })
+  @IsOptional()
+  @IsLatitude()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 69.240562 })
+  @IsOptional()
+  @IsLongitude()
+  longitude?: number;
+
+  @ApiPropertyOptional({ enum: PaymentStatus, example: PaymentStatus.PAID })
   @IsOptional()
   @IsEnum(PaymentStatus)
   paymentStatus?: PaymentStatus;
 
-  @ApiProperty({
-    type: () => [CreateAdminOrderItemDto],
-  })
+  @ApiProperty({ type: () => [CreateAdminOrderItemDto] })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

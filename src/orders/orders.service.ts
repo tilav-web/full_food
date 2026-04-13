@@ -205,7 +205,7 @@ export class OrdersService {
 
     const customerUserId = await this.resolveCustomerUserId(dto.customerUserId);
     const items = await this.getPreparedRequestedItems(dto.items);
-    const delivery = this.normalizeDelivery(dto);
+    const delivery = this.normalizeDeliveryOptional(dto);
 
     const order = await this.prisma.$transaction(async (transaction) => {
       await this.decrementStockForItems(transaction, items);
@@ -217,19 +217,15 @@ export class OrdersService {
         paymentStatus,
         location: {
           source: OrderLocationSource.ADMIN_PANEL,
-          latitude: dto.latitude,
-          longitude: dto.longitude,
+          latitude: dto.latitude ?? 0,
+          longitude: dto.longitude ?? 0,
         },
         customer: {
-          phone: this.normalizeCustomerPhone(dto.customerPhone),
-          firstName: this.normalizeRequiredText(
-            dto.customerFirstName,
-            'Mijoz ismi yuborilishi kerak.',
-          ),
-          lastName: this.normalizeRequiredText(
-            dto.customerLastName,
-            'Mijoz familiyasi yuborilishi kerak.',
-          ),
+          phone: dto.customerPhone
+            ? this.normalizeCustomerPhone(dto.customerPhone)
+            : '-',
+          firstName: dto.customerFirstName?.trim() || 'Mijoz',
+          lastName: dto.customerLastName?.trim() || '-',
         },
         delivery,
         items,
@@ -801,6 +797,23 @@ export class OrdersService {
 
     return {
       addressLine,
+      entrance: this.normalizeOptionalText(dto.entrance),
+      floor: this.normalizeOptionalText(dto.floor),
+      apartment: this.normalizeOptionalText(dto.apartment),
+      note: this.normalizeOptionalText(dto.note),
+    };
+  }
+
+  private normalizeDeliveryOptional(
+    dto: Partial<
+      Pick<
+        CreateCheckoutDto,
+        'addressLine' | 'entrance' | 'floor' | 'apartment' | 'note'
+      >
+    >,
+  ): DeliveryPayload {
+    return {
+      addressLine: dto.addressLine?.trim() || 'Restoran ichida',
       entrance: this.normalizeOptionalText(dto.entrance),
       floor: this.normalizeOptionalText(dto.floor),
       apartment: this.normalizeOptionalText(dto.apartment),
