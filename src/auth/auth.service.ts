@@ -326,7 +326,7 @@ export class AuthService {
     response.cookie(this.getRefreshCookieName(), refreshToken, {
       httpOnly: true,
       secure: this.isRefreshCookieSecure(),
-      sameSite: 'lax',
+      sameSite: this.isRefreshCookieSecure() ? 'none' : 'lax',
       path: '/auth/web',
       maxAge: this.getRefreshCookieMaxAgeMs(),
     });
@@ -336,7 +336,7 @@ export class AuthService {
     response.clearCookie(this.getRefreshCookieName(), {
       httpOnly: true,
       secure: this.isRefreshCookieSecure(),
-      sameSite: 'lax',
+      sameSite: this.isRefreshCookieSecure() ? 'none' : 'lax',
       path: '/auth/web',
     });
   }
