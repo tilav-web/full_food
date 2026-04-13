@@ -209,11 +209,18 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
 
         if (existingUser) {
           await ctx.reply(
-            `Siz allaqachon ro'yxatdan o'tgansiz. Sizning rolingiz: ${this.formatRole(
-              existingUser.role,
-            )}.`,
+            'Siz allaqachon ro`yxatdan o`tgansiz. Mini App ni ochish uchun pastdagi tugmani bosing.',
             {
-              reply_markup: { remove_keyboard: true },
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: 'Mini App ni ochish',
+                      web_app: { url: this.getMiniAppUrl() },
+                    },
+                  ],
+                ],
+              },
             },
           );
           return;
@@ -255,11 +262,18 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
         });
 
         await ctx.reply(
-          `Ro'yxatdan o'tish yakunlandi. Sizning rolingiz: ${this.formatRole(
-            user.role,
-          )}.`,
+          'Ro`yxatdan o`tish yakunlandi! Mini App ni ochish uchun pastdagi tugmani bosing.',
           {
-            reply_markup: { remove_keyboard: true },
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: 'Mini App ni ochish',
+                    web_app: { url: this.getMiniAppUrl() },
+                  },
+                ],
+              ],
+            },
           },
         );
       } catch (error) {
@@ -435,6 +449,13 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
       description.includes('chat not found') ||
       description.includes('user is deactivated') ||
       description.includes('bot was kicked')
+    );
+  }
+
+  private getMiniAppUrl(): string {
+    return (
+      this.configService.get<string>('MINI_APP_URL') ??
+      'https://fullfood.netlify.app'
     );
   }
 
