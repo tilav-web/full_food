@@ -7,7 +7,7 @@ import { UsersService } from './users.service';
 
 @Module({
   imports: [forwardRef(() => AuthModule)],
-  controllers: [UsersController, TelegramUsersController, WebUsersController],
+  controllers: [TelegramUsersController, WebUsersController, UsersController],
   providers: [UsersService],
   exports: [UsersService],
 })
