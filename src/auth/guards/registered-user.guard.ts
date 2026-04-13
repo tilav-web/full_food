@@ -10,8 +10,9 @@ import { TelegramRequest } from '../interfaces/telegram-request.interface';
 export class RegisteredUserGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<TelegramRequest>();
+    const user = request.authUser ?? request.telegramAuth?.user;
 
-    if (!request.telegramAuth?.user) {
+    if (!user) {
       throw new ForbiddenException(
         "Bu amal uchun foydalanuvchi avval bot orqali ro'yxatdan o'tgan bo'lishi kerak.",
       );

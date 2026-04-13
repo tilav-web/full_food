@@ -17,9 +17,9 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
-import { CurrentTelegramUser } from '../auth/decorators/current-telegram-user.decorator';
+import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
 import { RegisteredUserGuard } from '../auth/guards/registered-user.guard';
-import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
+import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
 import { ApiTelegramInitDataAuth } from '../docs/swagger.decorators';
 import { CartResponseDoc } from '../docs/swagger.models';
 import type { PublicUser } from '../users/users.service';
@@ -28,7 +28,7 @@ import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { CartService } from './cart.service';
 
 @Controller('cart')
-@UseGuards(TelegramAuthGuard, RegisteredUserGuard)
+@UseGuards(HybridAuthGuard, RegisteredUserGuard)
 @ApiTags('Cart')
 @ApiTelegramInitDataAuth()
 @ApiUnauthorizedResponse({
@@ -50,7 +50,7 @@ export class CartController {
   @ApiOkResponse({
     type: CartResponseDoc,
   })
-  getCart(@CurrentTelegramUser() user: PublicUser) {
+  getCart(@CurrentAuthUser() user: PublicUser) {
     return this.cartService.getCart(user);
   }
 
@@ -67,7 +67,7 @@ export class CartController {
     description: "Faqat active bo'lgan product savatga qo'shiladi.",
   })
   addItem(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Body() dto: AddCartItemDto,
   ) {
     return this.cartService.addItem(user, dto);
@@ -89,7 +89,7 @@ export class CartController {
       "Active bo'lmagan product quantity'sini o'zgartirib bo'lmaydi.",
   })
   updateItemQuantity(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Param('productId') productId: string,
     @Body() dto: UpdateCartItemDto,
   ) {
@@ -108,7 +108,7 @@ export class CartController {
     type: CartResponseDoc,
   })
   removeItem(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Param('productId') productId: string,
   ) {
     return this.cartService.removeItem(user, productId);

@@ -19,12 +19,11 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
-import { CurrentTelegramUser } from '../auth/decorators/current-telegram-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RegisteredUserGuard } from '../auth/guards/registered-user.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
 import {
   ApiTelegramInitDataAuth,
   ApiWebBearerAuth,
@@ -44,7 +43,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
-  @UseGuards(TelegramAuthGuard, RegisteredUserGuard)
+  @UseGuards(HybridAuthGuard, RegisteredUserGuard)
   @ApiTelegramInitDataAuth()
   @ApiOperation({
     summary: 'Buyurtma yaratish',
@@ -61,7 +60,7 @@ export class OrdersController {
     description: 'Savat bo`sh yoki active bo`lmagan product mavjud.',
   })
   checkout(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Body() dto: CreateCheckoutDto,
   ) {
     return this.ordersService.checkout(user, dto);
@@ -97,7 +96,7 @@ export class OrdersController {
   }
 
   @Get('me')
-  @UseGuards(TelegramAuthGuard, RegisteredUserGuard)
+  @UseGuards(HybridAuthGuard, RegisteredUserGuard)
   @ApiTelegramInitDataAuth()
   @ApiOperation({
     summary: 'User orderlari ro`yxati',
@@ -108,14 +107,14 @@ export class OrdersController {
     type: OrderListResponseDoc,
   })
   listMyOrders(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Query() query: ListOrdersQueryDto,
   ) {
     return this.ordersService.listMyOrders(user, query);
   }
 
   @Get('me/:id')
-  @UseGuards(TelegramAuthGuard, RegisteredUserGuard)
+  @UseGuards(HybridAuthGuard, RegisteredUserGuard)
   @ApiTelegramInitDataAuth()
   @ApiOperation({
     summary: 'Userning bitta orderi',
@@ -128,7 +127,7 @@ export class OrdersController {
     type: OrderResponseDoc,
   })
   findMyOrder(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Param('id') id: string,
   ) {
     return this.ordersService.findMyOrder(user, id);

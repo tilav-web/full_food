@@ -16,9 +16,9 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
-import { CurrentTelegramUser } from '../auth/decorators/current-telegram-user.decorator';
+import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
 import { RegisteredUserGuard } from '../auth/guards/registered-user.guard';
-import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
+import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
 import { ApiTelegramInitDataAuth } from '../docs/swagger.decorators';
 import type { PublicUser } from '../users/users.service';
 import { CreateLocationDto } from './dto/create-location.dto';
@@ -26,7 +26,7 @@ import { UpdateLocationDto } from './dto/update-location.dto';
 import { LocationsService } from './locations.service';
 
 @Controller('locations')
-@UseGuards(TelegramAuthGuard, RegisteredUserGuard)
+@UseGuards(HybridAuthGuard, RegisteredUserGuard)
 @ApiTags('Locations')
 @ApiTelegramInitDataAuth()
 @ApiUnauthorizedResponse({
@@ -42,7 +42,7 @@ export class LocationsController {
   @ApiOperation({
     summary: 'Saqlangan joylashuvlar ro`yxati',
   })
-  findAll(@CurrentTelegramUser() user: PublicUser) {
+  findAll(@CurrentAuthUser() user: PublicUser) {
     return this.locationsService.findAllByUser(user.id);
   }
 
@@ -51,7 +51,7 @@ export class LocationsController {
     summary: 'Yangi joylashuv saqlash',
   })
   create(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Body() dto: CreateLocationDto,
   ) {
     return this.locationsService.create(user.id, dto);
@@ -63,7 +63,7 @@ export class LocationsController {
   })
   @ApiParam({ name: 'id' })
   update(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Param('id') id: string,
     @Body() dto: UpdateLocationDto,
   ) {
@@ -76,7 +76,7 @@ export class LocationsController {
   })
   @ApiParam({ name: 'id' })
   remove(
-    @CurrentTelegramUser() user: PublicUser,
+    @CurrentAuthUser() user: PublicUser,
     @Param('id') id: string,
   ) {
     return this.locationsService.remove(user.id, id);

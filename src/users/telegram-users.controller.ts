@@ -6,8 +6,8 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CurrentTelegramUser } from '../auth/decorators/current-telegram-user.decorator';
-import { TelegramAuthGuard } from '../auth/guards/telegram-auth.guard';
+import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
+import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
 import { ApiTelegramInitDataAuth } from '../docs/swagger.decorators';
 import { PublicUserResponseDoc } from '../docs/swagger.models';
 import { PublicUser } from './users.service';
@@ -16,7 +16,7 @@ import { PublicUser } from './users.service';
 @ApiTags('Users')
 export class TelegramUsersController {
   @Get('me')
-  @UseGuards(TelegramAuthGuard)
+  @UseGuards(HybridAuthGuard)
   @ApiTelegramInitDataAuth()
   @ApiOperation({
     summary: 'Mini App user profili',
@@ -32,7 +32,7 @@ export class TelegramUsersController {
   @ApiNotFoundResponse({
     description: 'Foydalanuvchi bot orqali ro`yxatdan o`tmagan.',
   })
-  getProfile(@CurrentTelegramUser() user: PublicUser | null) {
+  getProfile(@CurrentAuthUser() user: PublicUser | null) {
     if (!user) {
       throw new NotFoundException(
         "Foydalanuvchi bot orqali ro'yxatdan o'tmagan.",
