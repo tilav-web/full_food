@@ -108,6 +108,26 @@ export class ProductsController {
     return this.productsService.update(id, dto);
   }
 
+  @Get('batches/list')
+  @Roles(Role.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
+  @ApiOperation({
+    summary: 'Kirimlar tarixini olish',
+    description: 'Barcha batch lar ro`yxati, productId bo`yicha filter qilish mumkin.',
+  })
+  listBatches(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('productId') productId?: string,
+  ) {
+    return this.productsService.listBatches({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      productId: productId || undefined,
+    });
+  }
+
   @Post(':id/stock')
   @Roles(Role.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)

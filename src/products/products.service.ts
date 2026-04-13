@@ -256,6 +256,42 @@ export class ProductsService {
     return this.toResponse(updatedProduct);
   }
 
+  async listBatches(query: { page?: number; limit?: number; productId?: string }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where: Prisma.InventoryBatchWhereInput = query.productId
+      ? { productId: query.productId }
+      : {};
+
+    const [total, batches] = await this.prisma.$transaction([
+      this.prisma.inventoryBatch.count({ where }),
+      this.prisma.inventoryBatch.findMany({
+        where,
+        include: {
+          product: { select: { id: true, name: true, image: true } },
+          createdByStaff: { select: { id: true, firstName: true, lastName: true } },
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      data: batches.map((b) => ({
+        id: b.id,
+        quantity: b.quantity,
+        receivedAt: b.receivedAt,
+        createdAt: b.createdAt,
+        product: b.product,
+        createdByStaff: b.createdByStaff
+          ? { id: b.createdByStaff.id, firstName: b.createdByStaff.firstName, lastName: b.createdByStaff.lastName }
+          : null,
+      })),
+      meta: { total, page, limit, totalPages: total === 0 ? 0 : Math.ceil(total / limit) },
+    };
+  }
+
   private async ensureProductExists(
     id: string,
   ): Promise<{ id: string; stockQuantity: number }> {
