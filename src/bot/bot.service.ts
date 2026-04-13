@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import { Bot, Keyboard } from 'grammy';
+import { LocationsService } from '../locations/locations.service';
 import { UsersService } from '../users/users.service';
 import { BroadcastMessageDto } from './dto/broadcast-message.dto';
 
@@ -18,9 +19,12 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BotService.name);
   private bot?: Bot;
 
+  private pendingLocationLabels = new Map<string, string>();
+
   constructor(
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly locationsService: LocationsService,
   ) {}
 
   onModuleInit() {
@@ -118,6 +122,8 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     entrance: string | null;
     floor: string | null;
     apartment: string | null;
+    latitude: number;
+    longitude: number;
     totalPrice: number;
     itemsCount: number;
   }): Promise<void> {
@@ -140,18 +146,26 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
       payload.apartment ? `Xonadon: ${payload.apartment}` : null,
     ].filter((part) => part !== null);
 
-    const message = [
-      `Yangi buyurtma: ${payload.orderNumber}`,
-      `Manba: ${payload.source}`,
-      `Mijoz: ${payload.customerName}`,
-      `Telefon: ${payload.customerPhone}`,
-      `Manzil: ${addressParts.join(', ')}`,
-      `Mahsulotlar: ${payload.itemsCount} ta`,
-      `Jami: ${payload.totalPrice}`,
-    ].join('\n');
+    const locationLink =
+      payload.latitude !== 0 || payload.longitude !== 0
+        ? `https://maps.google.com/maps?q=${payload.latitude},${payload.longitude}`
+        : null;
+
+    const messageParts = [
+      `🆕 Yangi buyurtma: ${payload.orderNumber}`,
+      `📦 Manba: ${payload.source === 'MINI_APP' ? 'Mini App' : 'Kassir paneli'}`,
+      `👤 Mijoz: ${payload.customerName}`,
+      `📞 Telefon: ${payload.customerPhone}`,
+      `📍 Manzil: ${addressParts.join(', ')}`,
+      locationLink ? `🗺 Xarita: ${locationLink}` : null,
+      `🍽 Mahsulotlar: ${payload.itemsCount} ta`,
+      `💰 Jami: ${payload.totalPrice.toLocaleString()} so'm`,
+    ]
+      .filter((part) => part !== null)
+      .join('\n');
 
     try {
-      await this.bot.api.sendMessage(channelId, message);
+      await this.bot.api.sendMessage(channelId, messageParts);
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -267,6 +281,102 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
           "Ro'yxatdan o'tkazishda xatolik yuz berdi. Keyinroq qayta urinib ko'ring.",
           {
             reply_markup: this.createPhoneKeyboard(),
+          },
+        );
+      }
+    });
+
+    this.bot.command('location', async (ctx) => {
+      const telegramId = ctx.from?.id ? String(ctx.from.id) : null;
+
+      if (!telegramId) {
+        return;
+      }
+
+      const user =
+        await this.usersService.findPublicByTelegramId(telegramId);
+
+      if (!user) {
+        await ctx.reply(
+          'Avval /start buyrug`i orqali ro`yxatdan o`ting.',
+        );
+        return;
+      }
+
+      const label = ctx.match?.trim() || '';
+
+      if (!label) {
+        await ctx.reply(
+          'Joylashuv nomini kiriting.\n\nMisol: /location Uyim\n\nKeyin pastdagi tugma orqali joylashuvni yuboring.',
+          {
+            reply_markup: new Keyboard()
+              .requestLocation('Joylashuvni yuborish')
+              .resized()
+              .oneTime(),
+          },
+        );
+        return;
+      }
+
+      this.pendingLocationLabels.set(telegramId, label);
+
+      await ctx.reply(
+        `"${label}" uchun joylashuvni yuboring.`,
+        {
+          reply_markup: new Keyboard()
+            .requestLocation('Joylashuvni yuborish')
+            .resized()
+            .oneTime(),
+        },
+      );
+    });
+
+    this.bot.on('message:location', async (ctx) => {
+      const telegramId = ctx.from?.id ? String(ctx.from.id) : null;
+
+      if (!telegramId) {
+        return;
+      }
+
+      const user =
+        await this.usersService.findPublicByTelegramId(telegramId);
+
+      if (!user) {
+        await ctx.reply(
+          'Avval /start buyrug`i orqali ro`yxatdan o`ting.',
+        );
+        return;
+      }
+
+      const location = ctx.message.location;
+      const label =
+        this.pendingLocationLabels.get(telegramId) || 'Mening joylashuvim';
+      this.pendingLocationLabels.delete(telegramId);
+
+      try {
+        const saved = await this.locationsService.createFromBot(
+          user.id,
+          label,
+          location.latitude,
+          location.longitude,
+        );
+
+        await ctx.reply(
+          `Joylashuv saqlandi: "${saved.label}"\n\nEndi Mini App ga qaytib buyurtma berishingiz mumkin.`,
+          {
+            reply_markup: { remove_keyboard: true },
+          },
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Location saqlashda xatolik: ${message}`,
+        );
+        await ctx.reply(
+          'Joylashuvni saqlashda xatolik yuz berdi. Qayta urinib ko`ring.',
+          {
+            reply_markup: { remove_keyboard: true },
           },
         );
       }

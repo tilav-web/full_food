@@ -686,6 +686,8 @@ export class OrdersService {
       entrance: order.entrance,
       floor: order.floor,
       apartment: order.apartment,
+      latitude: order.latitude,
+      longitude: order.longitude,
       totalPrice: Number(totalPrice),
       itemsCount: order.items.length,
     });
