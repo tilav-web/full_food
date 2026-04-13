@@ -6,6 +6,7 @@ import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
 import { LocationsModule } from './locations/locations.module';
 import { OrdersModule } from './orders/orders.module';
+import { StatisticsModule } from './statistics/statistics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { UnitsModule } from './units/units.module';
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module';
     ProductsModule,
     OrdersModule,
     LocationsModule,
+    StatisticsModule,
   ],
   controllers: [],
   providers: [],
