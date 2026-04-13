@@ -50,6 +50,20 @@ export class CategoriesController {
     return this.categoriesService.findAll(query);
   }
 
+  @Get('menu')
+  @ApiOperation({
+    summary: 'Categorylarni productlari bilan olish',
+    description:
+      'Har bir category o`ziga tegishli active va omborda mavjud productlar bilan qaytadi. Mini App menu uchun.',
+  })
+  @ApiOkResponse({
+    type: CategoryResponseDoc,
+    isArray: true,
+  })
+  findAllWithProducts(@Query() query: ListCategoriesQueryDto) {
+    return this.categoriesService.findAllWithProducts(query);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Category ni ID bo`yicha olish',

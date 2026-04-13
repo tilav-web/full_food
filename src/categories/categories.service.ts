@@ -15,6 +15,27 @@ type CategoryResponse = {
   name: string;
 };
 
+type CategoryWithProductsResponse = {
+  id: string;
+  image: string;
+  name: string;
+  products: Array<{
+    id: string;
+    image: string;
+    name: string;
+    description: string;
+    price: number;
+    stockQuantity: number;
+    isActive: boolean;
+    unitId: string;
+    unit: {
+      id: string;
+      name: string;
+      symbol: string;
+    };
+  }>;
+};
+
 @Injectable()
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -51,6 +72,62 @@ export class CategoriesService {
     });
 
     return categories.map((category) => this.toResponse(category));
+  }
+
+  async findAllWithProducts(
+    query: ListCategoriesQueryDto,
+  ): Promise<CategoryWithProductsResponse[]> {
+    const search = query.search?.trim();
+
+    const categories = await this.prisma.category.findMany({
+      where: search
+        ? {
+            name: {
+              contains: search,
+            },
+          }
+        : undefined,
+      include: {
+        products: {
+          where: {
+            isActive: true,
+            stockQuantity: {
+              gt: 0,
+            },
+          },
+          include: {
+            unit: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return categories.map((category) => ({
+      id: category.id,
+      image: category.image,
+      name: category.name,
+      products: category.products.map((product) => ({
+        id: product.id,
+        image: product.image,
+        name: product.name,
+        description: product.description,
+        price: Number(product.price),
+        stockQuantity: product.stockQuantity,
+        isActive: product.isActive,
+        unitId: product.unitId,
+        unit: {
+          id: product.unit.id,
+          name: product.unit.name,
+          symbol: product.unit.symbol,
+        },
+      })),
+    }));
   }
 
   async findById(id: string): Promise<CategoryResponse> {
