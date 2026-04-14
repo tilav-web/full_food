@@ -685,7 +685,11 @@ export class OrdersService {
       latitude: order.latitude,
       longitude: order.longitude,
       totalPrice: Number(totalPrice),
-      itemsCount: order.items.length,
+      items: order.items.map((item) => ({
+        name: item.productName,
+        quantity: item.quantity,
+        lineTotal: Number(item.lineTotal),
+      })),
     });
   }
 

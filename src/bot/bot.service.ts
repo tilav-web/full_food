@@ -125,7 +125,7 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     latitude: number;
     longitude: number;
     totalPrice: number;
-    itemsCount: number;
+    items: { name: string; quantity: number; lineTotal: number }[];
   }): Promise<void> {
     if (!this.bot) {
       return;
@@ -158,7 +158,11 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
       `📞 Telefon: ${payload.customerPhone}`,
       `📍 Manzil: ${addressParts.join(', ')}`,
       locationLink ? `🗺 Xarita: ${locationLink}` : null,
-      `🍽 Mahsulotlar: ${payload.itemsCount} ta`,
+      `🍽 Mahsulotlar (${payload.items.length} ta):`,
+      ...payload.items.map(
+        (item) =>
+          `  • ${item.name} × ${item.quantity} — ${item.lineTotal.toLocaleString()} so'm`,
+      ),
       `💰 Jami: ${payload.totalPrice.toLocaleString()} so'm`,
     ]
       .filter((part) => part !== null)
