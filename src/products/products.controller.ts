@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,10 +9,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import {
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiOkResponse,
@@ -30,16 +36,18 @@ import {
 } from '../docs/swagger.models';
 import { CurrentAuthUser } from '../auth/decorators/current-auth-user.decorator';
 import type { PublicUser } from '../users/users.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { AddProductStockDto } from './dto/add-product-stock.dto';
-import { CreateProductDto } from './dto/create-product.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
 @Controller('products')
 @ApiTags('Products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -73,9 +81,40 @@ export class ProductsController {
   @Roles(Role.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiWebBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        if (!file.mimetype.startsWith('image/')) {
+          callback(
+            new BadRequestException('Faqat rasm fayllari yuklash mumkin.'),
+            false,
+          );
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
   @ApiOperation({
     summary: 'Product yaratish',
     description: 'Faqat `SUPER_ADMIN` product yarata oladi.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['name', 'description', 'price', 'image', 'categoryId', 'unitId'],
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        price: { type: 'number' },
+        image: { type: 'string', format: 'binary' },
+        categoryId: { type: 'string' },
+        unitId: { type: 'string' },
+        isActive: { type: 'boolean' },
+      },
+    },
   })
   @ApiCreatedResponse({
     type: ProductResponseDoc,
@@ -83,16 +122,63 @@ export class ProductsController {
   @ApiForbiddenResponse({
     description: 'Faqat SUPER_ADMIN uchun.',
   })
-  create(@Body() dto: CreateProductDto) {
-    return this.productsService.create(dto);
+  async create(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { name: string; description: string; price: string; categoryId: string; unitId: string; isActive?: string },
+  ) {
+    if (!file) {
+      throw new BadRequestException('Rasm yuborilmadi.');
+    }
+
+    const { url } = await this.uploadsService.saveImage(file);
+
+    return this.productsService.create({
+      image: url,
+      name: body.name,
+      description: body.description,
+      price: Number(body.price),
+      categoryId: body.categoryId,
+      unitId: body.unitId,
+      isActive: body.isActive === 'true' ? true : undefined,
+    });
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiWebBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        if (!file.mimetype.startsWith('image/')) {
+          callback(
+            new BadRequestException('Faqat rasm fayllari yuklash mumkin.'),
+            false,
+          );
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
   @ApiOperation({
     summary: 'Product ni yangilash',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        price: { type: 'number' },
+        image: { type: 'string', format: 'binary' },
+        categoryId: { type: 'string' },
+        unitId: { type: 'string' },
+        isActive: { type: 'boolean' },
+      },
+    },
   })
   @ApiParam({
     name: 'id',
@@ -104,8 +190,27 @@ export class ProductsController {
   @ApiForbiddenResponse({
     description: 'Faqat SUPER_ADMIN uchun.',
   })
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.productsService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: { name?: string; description?: string; price?: string; categoryId?: string; unitId?: string; isActive?: string },
+  ) {
+    let image: string | undefined;
+
+    if (file) {
+      const result = await this.uploadsService.saveImage(file);
+      image = result.url;
+    }
+
+    return this.productsService.update(id, {
+      image,
+      name: body.name,
+      description: body.description,
+      price: body.price !== undefined ? Number(body.price) : undefined,
+      categoryId: body.categoryId,
+      unitId: body.unitId,
+      isActive: body.isActive !== undefined ? body.isActive === 'true' : undefined,
+    });
   }
 
   @Get('batches/list')

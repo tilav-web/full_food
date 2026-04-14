@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,11 +8,16 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import {
+  ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiOkResponse,
@@ -27,15 +33,17 @@ import {
   CategoryResponseDoc,
   MessageResponseDoc,
 } from '../docs/swagger.models';
+import { UploadsService } from '../uploads/uploads.service';
 import { CategoriesService } from './categories.service';
-import { CreateCategoryDto } from './dto/create-category.dto';
 import { ListCategoriesQueryDto } from './dto/list-categories-query.dto';
-import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Controller('categories')
 @ApiTags('Categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -83,9 +91,35 @@ export class CategoriesController {
   @Roles(Role.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiWebBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        if (!file.mimetype.startsWith('image/')) {
+          callback(
+            new BadRequestException('Faqat rasm fayllari yuklash mumkin.'),
+            false,
+          );
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
   @ApiOperation({
     summary: 'Category yaratish',
     description: 'Faqat `SUPER_ADMIN` foydalanuvchi category yarata oladi.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['name', 'image'],
+      properties: {
+        name: { type: 'string', example: 'Burgerlar' },
+        image: { type: 'string', format: 'binary' },
+      },
+    },
   })
   @ApiCreatedResponse({
     type: CategoryResponseDoc,
@@ -96,16 +130,54 @@ export class CategoriesController {
   @ApiConflictResponse({
     description: 'Bunday nomdagi category allaqachon mavjud.',
   })
-  create(@Body() dto: CreateCategoryDto) {
-    return this.categoriesService.create(dto);
+  async create(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('name') name: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Rasm yuborilmadi.');
+    }
+
+    if (!name?.trim()) {
+      throw new BadRequestException('Nomi kiritilishi shart.');
+    }
+
+    const { url } = await this.uploadsService.saveImage(file);
+
+    return this.categoriesService.create({ image: url, name });
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiWebBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        if (!file.mimetype.startsWith('image/')) {
+          callback(
+            new BadRequestException('Faqat rasm fayllari yuklash mumkin.'),
+            false,
+          );
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
   @ApiOperation({
     summary: 'Category ni yangilash',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Lavashlar' },
+        image: { type: 'string', format: 'binary' },
+      },
+    },
   })
   @ApiParam({
     name: 'id',
@@ -120,8 +192,22 @@ export class CategoriesController {
   @ApiConflictResponse({
     description: 'Bunday nomdagi category allaqachon mavjud.',
   })
-  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return this.categoriesService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('name') name?: string,
+  ) {
+    let image: string | undefined;
+
+    if (file) {
+      const result = await this.uploadsService.saveImage(file);
+      image = result.url;
+    }
+
+    return this.categoriesService.update(id, {
+      image,
+      name: name?.trim() || undefined,
+    });
   }
 
   @Delete(':id')
