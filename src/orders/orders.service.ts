@@ -335,6 +335,8 @@ export class OrdersService {
         },
       });
 
+      await this.notifyUserOnStatusChange(cancelledOrder);
+
       return this.toOrderResponse(cancelledOrder);
     }
 
@@ -368,6 +370,8 @@ export class OrdersService {
         },
       },
     });
+
+    await this.notifyUserOnStatusChange(updatedOrder);
 
     return this.toOrderResponse(updatedOrder);
   }
@@ -693,6 +697,38 @@ export class OrdersService {
     });
   }
 
+  private async notifyUserOnStatusChange(
+    order: OrderWithItems,
+  ): Promise<void> {
+    const statusMessages: Partial<Record<OrderStatus, string>> = {
+      [OrderStatus.ACCEPTED]: `✅ Buyurtma #${order.orderNumber} qabul qilindi!\nBuyurtmangiz tez orada tayyorlanadi.`,
+      [OrderStatus.READY]: `🍽 Buyurtma #${order.orderNumber} tayyor!\nBuyurtmangiz yetkazish uchun tayyor.`,
+      [OrderStatus.COMPLETED]: `🎉 Buyurtma #${order.orderNumber} yetkazildi!\nBuyurtmangiz uchun rahmat. Yoqimli ishtaha!`,
+      [OrderStatus.CANCELLED]: `❌ Buyurtma #${order.orderNumber} bekor qilindi.${order.cancelReason ? `\nSabab: ${order.cancelReason}` : ''}`,
+    };
+
+    const messageText = statusMessages[order.status];
+
+    if (!messageText || !order.userId) {
+      return;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: order.userId },
+      select: { telegramId: true, isBotActive: true },
+    });
+
+    if (!user?.telegramId || !user.isBotActive) {
+      return;
+    }
+
+    await this.botService.sendUserOrderNotification({
+      telegramId: user.telegramId,
+      orderNumber: order.orderNumber,
+      message: messageText,
+    });
+  }
+
   private async createOrderRecord(
     transaction: Prisma.TransactionClient,
     payload: OrderCreationPayload,
@@ -878,7 +914,9 @@ export class OrdersService {
     const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
       [OrderStatus.NEW]: [OrderStatus.ACCEPTED, OrderStatus.CANCELLED],
       [OrderStatus.ACCEPTED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-      [OrderStatus.PREPARING]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+      [OrderStatus.PREPARING]: [OrderStatus.READY, OrderStatus.CANCELLED],
+      [OrderStatus.READY]: [OrderStatus.DELIVERING, OrderStatus.CANCELLED],
+      [OrderStatus.DELIVERING]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
       [OrderStatus.COMPLETED]: [],
       [OrderStatus.CANCELLED]: [],
     };

@@ -33,7 +33,7 @@ export class StatisticsService {
       }),
       this.prisma.order.count({
         where: {
-          status: { in: [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PREPARING] },
+          status: { in: [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.DELIVERING] },
         },
       }),
       this.prisma.user.count(),

@@ -178,6 +178,29 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async sendUserOrderNotification(payload: {
+    telegramId: string;
+    orderNumber: string;
+    message: string;
+  }): Promise<void> {
+    if (!this.bot) {
+      return;
+    }
+
+    try {
+      await this.bot.api.sendMessage(
+        Number(payload.telegramId),
+        payload.message,
+      );
+    } catch (error) {
+      const messageText =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `User ${payload.telegramId} ga order ${payload.orderNumber} notification yuborilmadi: ${messageText}`,
+      );
+    }
+  }
+
   private registerHandlers() {
     if (!this.bot) {
       return;
