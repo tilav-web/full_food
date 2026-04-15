@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { randomInt } from 'node:crypto';
 import { BotService } from '../bot/bot.service';
+import { EventsGateway } from '../events/events.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizeUzbekPhoneNumber } from '../users/phone.util';
 import type { PublicUser } from '../users/users.service';
@@ -147,6 +148,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly botService: BotService,
+    private readonly eventsGateway: EventsGateway,
   ) {}
 
   async checkout(
@@ -337,6 +339,12 @@ export class OrdersService {
 
       await this.notifyUserOnStatusChange(cancelledOrder);
 
+      this.eventsGateway.emitOrderStatusUpdated({
+        id: cancelledOrder.id,
+        orderNumber: cancelledOrder.orderNumber,
+        status: cancelledOrder.status,
+      });
+
       return this.toOrderResponse(cancelledOrder);
     }
 
@@ -373,6 +381,12 @@ export class OrdersService {
 
     await this.notifyUserOnStatusChange(updatedOrder);
 
+    this.eventsGateway.emitOrderStatusUpdated({
+      id: updatedOrder.id,
+      orderNumber: updatedOrder.orderNumber,
+      status: updatedOrder.status,
+    });
+
     return this.toOrderResponse(updatedOrder);
   }
 
@@ -406,6 +420,12 @@ export class OrdersService {
           },
         },
       },
+    });
+
+    this.eventsGateway.emitOrderPaymentUpdated({
+      id: updatedOrder.id,
+      orderNumber: updatedOrder.orderNumber,
+      paymentStatus: updatedOrder.paymentStatus,
     });
 
     return this.toOrderResponse(updatedOrder);
@@ -694,6 +714,11 @@ export class OrdersService {
         quantity: item.quantity,
         lineTotal: Number(item.lineTotal),
       })),
+    });
+
+    this.eventsGateway.emitOrderCreated({
+      id: order.id,
+      orderNumber: order.orderNumber,
     });
   }
 

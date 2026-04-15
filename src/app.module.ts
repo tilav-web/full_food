@@ -12,6 +12,7 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { UnitsModule } from './units/units.module';
+import { EventsModule } from './events/events.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 
@@ -40,6 +41,7 @@ import { UsersModule } from './users/users.module';
     LocationsModule,
     StatisticsModule,
     UploadsModule,
+    EventsModule,
   ],
   controllers: [],
   providers: [],
