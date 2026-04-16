@@ -89,18 +89,14 @@ export class CategoriesService {
         : undefined,
       include: {
         products: {
-          where: {
-            isActive: true,
-            stockQuantity: {
-              gt: 0,
-            },
-          },
           include: {
             unit: true,
           },
-          orderBy: {
-            name: 'asc',
-          },
+          orderBy: [
+            { isActive: 'desc' },
+            { stockQuantity: 'desc' },
+            { name: 'asc' },
+          ],
         },
       },
       orderBy: {

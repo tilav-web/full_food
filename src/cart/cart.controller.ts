@@ -66,10 +66,7 @@ export class CartController {
   @ApiBadRequestResponse({
     description: "Faqat active bo'lgan product savatga qo'shiladi.",
   })
-  addItem(
-    @CurrentAuthUser() user: PublicUser,
-    @Body() dto: AddCartItemDto,
-  ) {
+  addItem(@CurrentAuthUser() user: PublicUser, @Body() dto: AddCartItemDto) {
     return this.cartService.addItem(user, dto);
   }
 
