@@ -1,10 +1,11 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ApiWebBearerAuth } from '../docs/swagger.decorators';
+import { SetRevenueDto } from './dto/set-revenue.dto';
 import { StatisticsService } from './statistics.service';
 
 @Controller('statistics')
@@ -19,5 +20,15 @@ export class StatisticsController {
   @ApiOperation({ summary: 'Dashboard statistikasi' })
   getDashboardStats() {
     return this.statisticsService.getDashboardStats();
+  }
+
+  @Patch('revenue/:key')
+  @ApiOperation({
+    summary: "Dashboarddagi daromad kartochkasini qo'lda o'zgartirish",
+    description: "`key` sifatida faqat `totalRevenue` yoki `todayRevenue` qabul qilinadi.",
+  })
+  @ApiParam({ name: 'key', example: 'todayRevenue' })
+  setRevenue(@Param('key') key: string, @Body() dto: SetRevenueDto) {
+    return this.statisticsService.setRevenue(key, dto.value);
   }
 }

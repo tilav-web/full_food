@@ -1,6 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+const MANUAL_REVENUE_KEYS = ['totalRevenue', 'todayRevenue'] as const;
+type ManualRevenueKey = (typeof MANUAL_REVENUE_KEYS)[number];
 
 @Injectable()
 export class StatisticsService {
@@ -22,8 +25,7 @@ export class StatisticsService {
       totalUsers,
       totalProducts,
       totalCategories,
-      revenueResult,
-      todayRevenueResult,
+      revenueSettings,
       ordersByStatus,
       weeklyOrders,
     ] = await Promise.all([
@@ -39,16 +41,8 @@ export class StatisticsService {
       this.prisma.user.count(),
       this.prisma.product.count(),
       this.prisma.category.count(),
-      this.prisma.order.aggregate({
-        _sum: { totalPrice: true },
-        where: { paymentStatus: PaymentStatus.PAID },
-      }),
-      this.prisma.order.aggregate({
-        _sum: { totalPrice: true },
-        where: {
-          paymentStatus: PaymentStatus.PAID,
-          createdAt: { gte: todayStart },
-        },
+      this.prisma.setting.findMany({
+        where: { key: { in: [...MANUAL_REVENUE_KEYS] } },
       }),
       this.prisma.order.groupBy({
         by: ['status'],
@@ -60,6 +54,10 @@ export class StatisticsService {
         orderBy: { createdAt: 'asc' },
       }),
     ]);
+
+    const settingsMap = new Map(revenueSettings.map((s) => [s.key, s.value]));
+    const totalRevenue = Number(settingsMap.get('totalRevenue') ?? 0);
+    const todayRevenue = Number(settingsMap.get('todayRevenue') ?? 0);
 
     const statusCounts: Record<string, number> = {};
     for (const item of ordersByStatus) {
@@ -96,11 +94,30 @@ export class StatisticsService {
         totalUsers,
         totalProducts,
         totalCategories,
-        totalRevenue: Number(revenueResult._sum.totalPrice ?? 0),
-        todayRevenue: Number(todayRevenueResult._sum.totalPrice ?? 0),
+        totalRevenue,
+        todayRevenue,
       },
       ordersByStatus: statusCounts,
       weeklyStats: dailyStats,
     };
+  }
+
+  async setRevenue(key: string, value: number) {
+    if (!MANUAL_REVENUE_KEYS.includes(key as ManualRevenueKey)) {
+      throw new BadRequestException(
+        `Noto'g'ri kalit. Ruxsat etilganlar: ${MANUAL_REVENUE_KEYS.join(', ')}.`,
+      );
+    }
+    if (!Number.isFinite(value) || value < 0) {
+      throw new BadRequestException('Qiymat 0 yoki undan katta son bo`lishi kerak.');
+    }
+
+    await this.prisma.setting.upsert({
+      where: { key },
+      create: { key, value: String(value) },
+      update: { value: String(value) },
+    });
+
+    return { key, value };
   }
 }

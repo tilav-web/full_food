@@ -128,6 +128,7 @@ type OrderCreationPayload = {
   userId: string | null;
   createdByStaffId: string | null;
   source: OrderSource;
+  status: OrderStatus;
   paymentStatus: PaymentStatus;
   location: {
     source: OrderLocationSource;
@@ -165,6 +166,7 @@ export class OrdersService {
         userId: user.id,
         createdByStaffId: null,
         source: OrderSource.MINI_APP,
+        status: OrderStatus.NEW,
         paymentStatus: PaymentStatus.PENDING,
         location: {
           source: OrderLocationSource.MINI_APP,
@@ -216,6 +218,7 @@ export class OrdersService {
         userId: customerUserId,
         createdByStaffId: staffUser.id,
         source: OrderSource.CASHIER_PANEL,
+        status: OrderStatus.COMPLETED,
         paymentStatus,
         location: {
           source: OrderLocationSource.ADMIN_PANEL,
@@ -234,7 +237,11 @@ export class OrdersService {
       });
     });
 
-    await this.notifyOrderCreated(order);
+    this.eventsGateway.emitOrderCreated({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      source: order.source,
+    });
     return this.toOrderResponse(order);
   }
 
@@ -296,7 +303,10 @@ export class OrdersService {
         );
       }
 
-      if (order.status === OrderStatus.COMPLETED) {
+      if (
+        order.status === OrderStatus.COMPLETED &&
+        order.source !== OrderSource.CASHIER_PANEL
+      ) {
         throw new BadRequestException(
           'Completed orderni bekor qilib bo`lmaydi.',
         );
@@ -719,6 +729,7 @@ export class OrdersService {
     this.eventsGateway.emitOrderCreated({
       id: order.id,
       orderNumber: order.orderNumber,
+      source: order.source,
     });
   }
 
@@ -772,7 +783,7 @@ export class OrdersService {
         userId: payload.userId,
         createdByStaffId: payload.createdByStaffId,
         source: payload.source,
-        status: OrderStatus.NEW,
+        status: payload.status,
         paymentStatus: payload.paymentStatus,
         locationSource: payload.location.source,
         latitude: payload.location.latitude,

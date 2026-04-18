@@ -39,6 +39,7 @@ import type { PublicUser } from '../users/users.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { AddProductStockDto } from './dto/add-product-stock.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
+import { SetProductStockDto } from './dto/set-product-stock.dto';
 import { ProductsService } from './products.service';
 
 @Controller('products')
@@ -259,6 +260,34 @@ export class ProductsController {
     @CurrentAuthUser() staffUser: PublicUser,
   ) {
     return this.productsService.addStock(id, dto, staffUser);
+  }
+
+  @Patch(':id/stock')
+  @Roles(Role.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiWebBearerAuth()
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Product ombor miqdorini to'g'irlash",
+    description:
+      "Admin xato qo'shgan bo'lsa, aniq stock miqdorini o'rnatadi. Farq batch sifatida yoziladi.",
+  })
+  @ApiParam({
+    name: 'id',
+    example: 'cmnzd8xwd0002p6f0n8yz1abc',
+  })
+  @ApiOkResponse({
+    type: ProductResponseDoc,
+  })
+  @ApiForbiddenResponse({
+    description: 'Faqat SUPER_ADMIN uchun.',
+  })
+  setStock(
+    @Param('id') id: string,
+    @Body() dto: SetProductStockDto,
+    @CurrentAuthUser() staffUser: PublicUser,
+  ) {
+    return this.productsService.setStock(id, dto, staffUser);
   }
 
   @Delete(':id')

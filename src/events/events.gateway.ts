@@ -28,7 +28,7 @@ export class EventsGateway
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
-  emitOrderCreated(order: { id: string; orderNumber: string }) {
+  emitOrderCreated(order: { id: string; orderNumber: string; source: string }) {
     this.server.emit('order:created', order);
   }
 

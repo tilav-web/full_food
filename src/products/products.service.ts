@@ -10,6 +10,7 @@ import type { PublicUser } from '../users/users.service';
 import { AddProductStockDto } from './dto/add-product-stock.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
+import { SetProductStockDto } from './dto/set-product-stock.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
 type ProductListItem = {
@@ -244,6 +245,64 @@ export class ProductsService {
               increment: dto.quantity,
             },
             isActive: true,
+          },
+          include: {
+            category: true,
+            unit: true,
+          },
+        });
+      },
+    );
+
+    return this.toResponse(updatedProduct);
+  }
+
+  async setStock(
+    productId: string,
+    dto: SetProductStockDto,
+    staffUser: PublicUser,
+  ): Promise<ProductListItem> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, stockQuantity: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product topilmadi.');
+    }
+
+    const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
+
+    if (Number.isNaN(receivedAt.getTime())) {
+      throw new BadRequestException('receivedAt noto`g`ri formatda yuborildi.');
+    }
+
+    const delta = dto.stockQuantity - product.stockQuantity;
+
+    if (delta === 0) {
+      const current = await this.prisma.product.findUnique({
+        where: { id: product.id },
+        include: { category: true, unit: true },
+      });
+      return this.toResponse(current!);
+    }
+
+    const updatedProduct = await this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.inventoryBatch.create({
+          data: {
+            productId: product.id,
+            quantity: delta,
+            receivedAt,
+            createdByStaffId: staffUser.id,
+          },
+        });
+
+        return transaction.product.update({
+          where: { id: product.id },
+          data: {
+            stockQuantity: dto.stockQuantity,
+            isActive: dto.stockQuantity > 0,
           },
           include: {
             category: true,
