@@ -105,7 +105,7 @@ export class ProductsController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['name', 'description', 'price', 'image', 'categoryId', 'unitId'],
+      required: ['name', 'description', 'price', 'categoryId', 'unitId'],
       properties: {
         name: { type: 'string' },
         description: { type: 'string' },
@@ -124,17 +124,18 @@ export class ProductsController {
     description: 'Faqat SUPER_ADMIN uchun.',
   })
   async create(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Body() body: { name: string; description: string; price: string; categoryId: string; unitId: string; isActive?: string },
   ) {
-    if (!file) {
-      throw new BadRequestException('Rasm yuborilmadi.');
+    let image: string | undefined;
+
+    if (file) {
+      const { url } = await this.uploadsService.saveImage(file);
+      image = url;
     }
 
-    const { url } = await this.uploadsService.saveImage(file);
-
     return this.productsService.create({
-      image: url,
+      image,
       name: body.name,
       description: body.description,
       price: Number(body.price),

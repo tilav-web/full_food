@@ -11,17 +11,17 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 type CategoryResponse = {
   id: string;
-  image: string;
+  image: string | null;
   name: string;
 };
 
 type CategoryWithProductsResponse = {
   id: string;
-  image: string;
+  image: string | null;
   name: string;
   products: Array<{
     id: string;
-    image: string;
+    image: string | null;
     name: string;
     description: string;
     price: number;
@@ -44,7 +44,7 @@ export class CategoriesService {
     try {
       const category = await this.prisma.category.create({
         data: {
-          image: dto.image.trim(),
+          image: dto.image?.trim() || null,
           name: dto.name.trim(),
         },
       });

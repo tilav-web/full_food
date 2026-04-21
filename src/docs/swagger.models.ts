@@ -175,8 +175,9 @@ export class CategoryResponseDoc {
 
   @ApiProperty({
     example: 'https://cdn.fullfood.uz/categories/burger.png',
+    nullable: true,
   })
-  image!: string;
+  image!: string | null;
 
   @ApiProperty({
     example: 'Burgerlar',
@@ -209,8 +210,9 @@ export class ProductResponseDoc {
 
   @ApiProperty({
     example: 'https://cdn.fullfood.uz/products/cheeseburger.png',
+    nullable: true,
   })
-  image!: string;
+  image!: string | null;
 
   @ApiProperty({
     example: 'Cheeseburger',
@@ -344,8 +346,9 @@ export class CartProductResponseDoc {
 
   @ApiProperty({
     example: 'https://cdn.fullfood.uz/products/cheeseburger.png',
+    nullable: true,
   })
-  image!: string;
+  image!: string | null;
 
   @ApiProperty({
     example: 'Cheeseburger',
@@ -636,8 +639,9 @@ export class OrderLocationDoc {
 export class OrderItemProductSnapshotDoc {
   @ApiProperty({
     example: 'https://cdn.fullfood.uz/products/cheeseburger.png',
+    nullable: true,
   })
-  image!: string;
+  image!: string | null;
 
   @ApiProperty({
     example: 'Cheeseburger',
@@ -657,8 +661,9 @@ export class OrderItemProductSnapshotDoc {
 
   @ApiProperty({
     example: 'https://cdn.fullfood.uz/categories/burger.png',
+    nullable: true,
   })
-  categoryImage!: string;
+  categoryImage!: string | null;
 
   @ApiProperty({
     example: 'Burgerlar',

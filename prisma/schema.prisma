@@ -77,7 +77,7 @@ model SavedLocation {
 
 model Category {
   id       String    @id @default(cuid())
-  image    String
+  image    String?
   name     String    @unique
   products Product[]
 }
@@ -93,7 +93,7 @@ model Unit {
 
 model Product {
   id            String   @id @default(cuid())
-  image         String
+  image         String?
   name          String
   description   String
   price         Decimal
@@ -186,11 +186,11 @@ model OrderItem {
   id                 String   @id @default(cuid())
   orderId            String
   productId          String?
-  productImage       String
+  productImage       String?
   productName        String
   productDescription String
   categoryId         String?
-  categoryImage      String
+  categoryImage      String?
   categoryName       String
   unitPrice          Decimal
   quantity           Int

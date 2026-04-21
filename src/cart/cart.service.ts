@@ -17,7 +17,7 @@ type CartItemResponse = {
   lineTotal: number;
   product: {
     id: string;
-    image: string;
+    image: string | null;
     name: string;
     description: string;
     price: number;
@@ -27,7 +27,7 @@ type CartItemResponse = {
     unitId: string;
     category: {
       id: string;
-      image: string;
+      image: string | null;
       name: string;
     };
     unit: {

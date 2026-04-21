@@ -10,12 +10,12 @@ import {
 import { transformOptionalBoolean } from './transform-optional-boolean.util';
 
 export class CreateProductDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'https://cdn.fullfood.uz/products/cheeseburger.png',
   })
   @IsString()
-  @IsNotEmpty()
-  image!: string;
+  @IsOptional()
+  image?: string;
 
   @ApiProperty({
     example: 'Cheeseburger',

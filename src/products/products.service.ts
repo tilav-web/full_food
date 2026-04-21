@@ -15,7 +15,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 
 type ProductListItem = {
   id: string;
-  image: string;
+  image: string | null;
   name: string;
   description: string;
   price: number;
@@ -25,7 +25,7 @@ type ProductListItem = {
   unitId: string;
   category: {
     id: string;
-    image: string;
+    image: string | null;
     name: string;
   };
   unit: {
@@ -66,7 +66,7 @@ export class ProductsService {
 
     const product = await this.prisma.product.create({
       data: {
-        image: dto.image.trim(),
+        image: dto.image?.trim() || null,
         name: dto.name.trim(),
         description: dto.description.trim(),
         price: new Prisma.Decimal(dto.price),
@@ -381,7 +381,7 @@ export class ProductsService {
     product: Product & {
       category: {
         id: string;
-        image: string;
+        image: string | null;
         name: string;
       };
       unit: {

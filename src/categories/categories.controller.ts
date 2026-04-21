@@ -114,7 +114,7 @@ export class CategoriesController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['name', 'image'],
+      required: ['name'],
       properties: {
         name: { type: 'string', example: 'Burgerlar' },
         image: { type: 'string', format: 'binary' },
@@ -131,20 +131,21 @@ export class CategoriesController {
     description: 'Bunday nomdagi category allaqachon mavjud.',
   })
   async create(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Body('name') name: string,
   ) {
-    if (!file) {
-      throw new BadRequestException('Rasm yuborilmadi.');
-    }
-
     if (!name?.trim()) {
       throw new BadRequestException('Nomi kiritilishi shart.');
     }
 
-    const { url } = await this.uploadsService.saveImage(file);
+    let image: string | undefined;
 
-    return this.categoriesService.create({ image: url, name });
+    if (file) {
+      const { url } = await this.uploadsService.saveImage(file);
+      image = url;
+    }
+
+    return this.categoriesService.create({ image, name });
   }
 
   @Patch(':id')

@@ -37,13 +37,13 @@ type PreparedOrderItem = {
   lineTotal: number;
   product: {
     id: string;
-    image: string;
+    image: string | null;
     name: string;
     description: string;
     categoryId: string;
     category: {
       id: string;
-      image: string;
+      image: string | null;
       name: string;
     };
   };
@@ -80,11 +80,11 @@ type OrderResponse = {
     unitPrice: number;
     lineTotal: number;
     product: {
-      image: string;
+      image: string | null;
       name: string;
       description: string;
       categoryId: string | null;
-      categoryImage: string;
+      categoryImage: string | null;
       categoryName: string;
     };
   }>;
