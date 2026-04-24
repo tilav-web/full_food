@@ -180,6 +180,7 @@ model Order {
   @@index([status])
   @@index([paymentStatus])
   @@index([customerPhone])
+  @@index([createdAt])
 }
 
 model OrderItem {

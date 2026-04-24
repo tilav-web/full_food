@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { setupSwagger } from './docs/swagger';
@@ -45,6 +46,7 @@ async function bootstrap() {
     },
     credentials: true,
   });
+  app.use(compression());
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({

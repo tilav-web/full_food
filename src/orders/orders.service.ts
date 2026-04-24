@@ -670,35 +670,35 @@ export class OrdersService {
     transaction: Prisma.TransactionClient,
     items: PreparedOrderItem[],
   ): Promise<void> {
-    for (const item of items) {
-      const product = await transaction.product.findUnique({
-        where: { id: item.productId },
-        select: {
-          id: true,
-          stockQuantity: true,
-        },
-      });
+    const productIds = items.map((item) => item.productId);
+    const products = await transaction.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, stockQuantity: true },
+    });
+    const stockById = new Map(products.map((p) => [p.id, p.stockQuantity]));
 
-      if (!product) {
+    const updates: Prisma.PrismaPromise<unknown>[] = [];
+    for (const item of items) {
+      const currentStock = stockById.get(item.productId);
+      if (currentStock === undefined) {
         throw new NotFoundException('Product topilmadi.');
       }
-
-      if (product.stockQuantity < item.quantity) {
+      if (currentStock < item.quantity) {
         throw new BadRequestException(
           `\`${item.product.name}\` omborda yetarli emas.`,
         );
       }
 
-      const nextStock = product.stockQuantity - item.quantity;
-
-      await transaction.product.update({
-        where: { id: product.id },
-        data: {
-          stockQuantity: nextStock,
-          isActive: nextStock > 0,
-        },
-      });
+      const nextStock = currentStock - item.quantity;
+      updates.push(
+        transaction.product.update({
+          where: { id: item.productId },
+          data: { stockQuantity: nextStock, isActive: nextStock > 0 },
+        }),
+      );
     }
+
+    await Promise.all(updates);
   }
 
   private async notifyOrderCreated(order: OrderWithItems): Promise<void> {
