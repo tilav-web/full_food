@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { AuthModule } from './auth/auth.module';
 import { BotModule } from './bot/bot.module';
 import { CartModule } from './cart/cart.module';
@@ -14,6 +13,7 @@ import { ProductsModule } from './products/products.module';
 import { UnitsModule } from './units/units.module';
 import { EventsModule } from './events/events.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { getUploadsDir } from './uploads/uploads-path';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -23,7 +23,7 @@ import { UsersModule } from './users/users.module';
       envFilePath: ['.env.local', '.env'],
     }),
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
+      rootPath: getUploadsDir(),
       serveRoot: '/uploads',
       serveStaticOptions: {
         index: false,

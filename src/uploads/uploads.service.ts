@@ -7,18 +7,18 @@ import {
   OPTIMIZED_IMAGE_EXTENSION,
   optimizeImageBuffer,
 } from './image-optimizer';
-
-const UPLOADS_DIR = join(process.cwd(), 'uploads');
+import { getUploadsDir } from './uploads-path';
 
 @Injectable()
 export class UploadsService {
   constructor(private readonly configService: ConfigService) {}
 
   async saveImage(file: Express.Multer.File): Promise<{ url: string }> {
-    await mkdir(UPLOADS_DIR, { recursive: true });
+    const uploadsDir = getUploadsDir();
+    await mkdir(uploadsDir, { recursive: true });
 
     const filename = `${randomUUID()}${OPTIMIZED_IMAGE_EXTENSION}`;
-    const filePath = join(UPLOADS_DIR, filename);
+    const filePath = join(uploadsDir, filename);
     const optimizedImage = await optimizeImageBuffer(file.buffer);
 
     await writeFile(filePath, optimizedImage);

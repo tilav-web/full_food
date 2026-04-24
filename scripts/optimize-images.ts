@@ -7,9 +7,10 @@ import {
   OPTIMIZED_IMAGE_EXTENSION,
   optimizeImageBuffer,
 } from '../src/uploads/image-optimizer';
+import { getUploadsDir } from '../src/uploads/uploads-path';
 
 const prisma = new PrismaClient();
-const uploadsDir = join(process.cwd(), 'uploads');
+const uploadsDir = getUploadsDir();
 const serverUrl = (process.env.SERVER_URL ?? '').replace(/\/$/, '');
 
 type ImageOwner =
