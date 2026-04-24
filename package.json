@@ -13,6 +13,7 @@
     "seed": "ts-node --transpile-only prisma/seed.ts",
     "seed:mock": "ts-node --transpile-only prisma/seed-mock.ts",
     "seed:rm": "ts-node --transpile-only prisma/seed-rm.ts",
+    "optimize:images": "ts-node --transpile-only scripts/optimize-images.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -43,6 +44,7 @@
     "grammy": "^1.42.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "swagger-ui-express": "^5.0.1"
   },
