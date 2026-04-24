@@ -63,7 +63,7 @@ export class UploadsController {
     schema: {
       type: 'object',
       properties: {
-        url: { type: 'string', example: '/uploads/abc123.webp' },
+        url: { type: 'string', example: '/uploads/abc123.jpg' },
       },
     },
   })
