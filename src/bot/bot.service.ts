@@ -36,6 +36,13 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.bot = new Bot(botToken);
+    this.bot.catch((err) => {
+      const e = err.error;
+      const message = e instanceof Error ? e.message : String(e);
+      this.logger.error(
+        `Bot middleware xatosi (update ${err.ctx.update.update_id}): ${message}`,
+      );
+    });
     this.registerHandlers();
 
     if (!this.isPollingEnabled()) {
@@ -223,6 +230,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.command('start', async (ctx) => {
+      if (ctx.chat?.type !== 'private') {
+        return;
+      }
+
       const telegramId = ctx.from?.id ? String(ctx.from.id) : null;
 
       if (telegramId) {
@@ -263,6 +274,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.on('message:contact', async (ctx) => {
+      if (ctx.chat?.type !== 'private') {
+        return;
+      }
+
       if (!ctx.from) {
         return;
       }
@@ -328,6 +343,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.command('location', async (ctx) => {
+      if (ctx.chat?.type !== 'private') {
+        return;
+      }
+
       const telegramId = ctx.from?.id ? String(ctx.from.id) : null;
 
       if (!telegramId) {
@@ -373,6 +392,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.on('message:location', async (ctx) => {
+      if (ctx.chat?.type !== 'private') {
+        return;
+      }
+
       const telegramId = ctx.from?.id ? String(ctx.from.id) : null;
 
       if (!telegramId) {
@@ -424,6 +447,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.on('message:text', async (ctx) => {
+      if (ctx.chat?.type !== 'private') {
+        return;
+      }
+
       if (ctx.from?.id) {
         await this.usersService.updateBotActiveStatusByTelegramId(
           String(ctx.from.id),
