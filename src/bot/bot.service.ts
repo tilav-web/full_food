@@ -153,10 +153,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
       payload.apartment ? `Xonadon: ${payload.apartment}` : null,
     ].filter((part) => part !== null);
 
-    const locationLink =
-      payload.latitude !== 0 || payload.longitude !== 0
-        ? `https://maps.google.com/maps?q=${payload.latitude},${payload.longitude}`
-        : null;
+    const locationLinks = this.buildLocationLinks(
+      payload.latitude,
+      payload.longitude,
+    );
 
     const messageParts = [
       `🆕 Yangi buyurtma: ${payload.orderNumber}`,
@@ -164,7 +164,15 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
       `👤 Mijoz: ${payload.customerName}`,
       `📞 Telefon: ${payload.customerPhone}`,
       `📍 Manzil: ${addressParts.join(', ')}`,
-      locationLink ? `🗺 Xarita: ${locationLink}` : null,
+      locationLinks
+        ? `🗺 Google Maps: ${locationLinks.googleMapsLink}`
+        : null,
+      locationLinks
+        ? `🗺 Yandex Maps: ${locationLinks.yandexMapsLink}`
+        : null,
+      locationLinks
+        ? `🚕 Yandex Go: ${locationLinks.yandexGoTaxiLink}`
+        : null,
       `🍽 Mahsulotlar (${payload.items.length} ta):`,
       ...payload.items.map(
         (item) =>
@@ -183,6 +191,27 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
         `Order xabari Telegram kanalga yuborilmadi: ${messageText}`,
       );
     }
+  }
+
+  private buildLocationLinks(latitude: number, longitude: number): {
+    googleMapsLink: string;
+    yandexMapsLink: string;
+    yandexGoTaxiLink: string;
+  } | null {
+    if (latitude === 0 && longitude === 0) {
+      return null;
+    }
+
+    const encodedLatitude = encodeURIComponent(String(latitude));
+    const encodedLongitude = encodeURIComponent(String(longitude));
+    const encodedCoordinates = `${encodedLatitude},${encodedLongitude}`;
+    const yandexCoordinates = `${encodedLongitude},${encodedLatitude}`;
+
+    return {
+      googleMapsLink: `https://maps.google.com/maps?q=${encodedCoordinates}`,
+      yandexMapsLink: `https://yandex.uz/maps/?ll=${yandexCoordinates}&pt=${yandexCoordinates}&z=17`,
+      yandexGoTaxiLink: `https://3.redirect.appmetrica.yandex.com/route?end-lat=${encodedLatitude}&end-lon=${encodedLongitude}&tariffClass=econom&ref=fullfood&appmetrica_tracking_id=1178268795219780156&lang=uz`,
+    };
   }
 
   async sendUserOrderNotification(payload: {
